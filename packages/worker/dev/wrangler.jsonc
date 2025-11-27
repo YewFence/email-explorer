@@ -23,7 +23,8 @@
 		{
 			"binding": "BUCKET",
 			"bucket_name": "email-explorer",
-			"preview_bucket_name": "email-explorer"
+			"preview_bucket_name": "email-explorer",
+            "remote": true
 		}
 	],
 	"send_email": [
@@ -36,7 +37,7 @@
 		"bindings": [
 			{
 				"name": "MAILBOX",
-				"class_name": "MailboxDO"
+				"class_name": "MailboxDO",
 			}
 		]
 	},

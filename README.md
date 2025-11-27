@@ -40,6 +40,8 @@ Please note that for sending emails, you will need to have you Cloudflare accoun
 ## Key Features
 
 - **🔒 Secure & Private**: Self-hosted on your Cloudflare account. No third-party tracking or data scanning.
+- **🔐 Smart Authentication**: Automatic first-user admin setup with role-based access control.
+- **👥 Multi-User Support**: Admin panel for managing users and mailbox permissions.
 - **✉️ Email Management**: Send, receive, and organize emails with a clean and intuitive interface.
 - **📁 Folder Organization**: Create custom folders to organize your emails.
 - **📎 Attachment Support**: View and download attachments directly in the browser.
@@ -52,6 +54,62 @@ To deploy Email Explorer, you can use the "Deploy to Cloudflare" button above or
 ```bash
 npm create cloudflare@latest -- --template=https://github.com/G4brym/email-explorer/tree/main/template
 ```
+
+### Configuration
+
+Email Explorer uses a factory function pattern for configuration. Edit `src/index.ts`:
+
+```typescript
+// Recommended: Smart Mode (Default)
+export default EmailExplorer({
+  auth: {
+    enabled: true
+    // registerEnabled not specified = smart mode
+  }
+})
+```
+
+**Smart Mode (Recommended):**
+- First user to register automatically becomes admin
+- Registration closes after first user
+- Admins can create additional users via admin panel
+- Perfect for production deployments
+
+**Other Modes:**
+```typescript
+// Open Registration (Development/Testing)
+export default EmailExplorer({
+  auth: {
+    enabled: true,
+    registerEnabled: true  // Anyone can register
+  }
+})
+
+// No Authentication (Single User)
+export default EmailExplorer({
+  auth: {
+    enabled: false
+  }
+})
+```
+
+### First-Time Setup
+
+1. **Deploy your worker** with smart mode enabled (default)
+2. **Visit your worker URL** in a browser
+3. **Register the first user** - this becomes your admin account
+4. **Log in** with your admin credentials
+5. **Manage additional users** through the admin panel
+
+### Admin Operations
+
+As an admin, you can:
+- Create new users
+- Grant/revoke mailbox access
+- Assign roles: `owner`, `admin`, `write`, or `read`
+- Promote users to admin status
+
+See [ROADMAP.md](ROADMAP.md) for detailed API documentation and configuration options.
 
 ## Roadmap
 

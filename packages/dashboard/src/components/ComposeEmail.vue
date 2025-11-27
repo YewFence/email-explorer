@@ -1,29 +1,77 @@
 <template>
-  <div v-if="isComposeModalOpen" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl text-gray-900 dark:text-gray-100">
-      <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
-        <h2 class="text-lg font-semibold">New Message</h2>
-        <button @click="closeModal" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white">&times;</button>
+  <div v-if="isComposeModalOpen" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all">
+      <div class="flex justify-between items-center bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-white">New Message</h2>
+        </div>
+        <button @click="closeModal" class="text-white/80 hover:text-white hover:bg-white/10 rounded-lg p-2 transition-all duration-200">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
-      <form @submit.prevent="send">
-        <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+      <form @submit.prevent="send" class="p-6">
+        <div v-if="error" class="bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg mb-6 flex items-start gap-3" role="alert">
+          <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
           <span class="block sm:inline">{{ error }}</span>
         </div>
-        <div class="mb-4">
-          <label for="to" class="block text-sm font-medium text-gray-700 dark:text-gray-300">To</label>
-          <input type="email" id="to" v-model="to" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" required />
+        <div class="mb-5">
+          <label for="to" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">To</label>
+          <input 
+            type="email" 
+            id="to" 
+            v-model="to" 
+            class="block w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:focus:ring-indigo-400 text-gray-900 dark:text-gray-100 px-4 py-3 transition-all duration-200" 
+            placeholder="recipient@example.com"
+            required 
+          />
         </div>
-        <div class="mb-4">
-          <label for="subject" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
-          <input type="text" id="subject" v-model="subject" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" required />
+        <div class="mb-5">
+          <label for="subject" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Subject</label>
+          <input 
+            type="text" 
+            id="subject" 
+            v-model="subject" 
+            class="block w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:focus:ring-indigo-400 text-gray-900 dark:text-gray-100 px-4 py-3 transition-all duration-200" 
+            placeholder="Email subject"
+            required 
+          />
         </div>
-        <div class="mb-4">
-          <label for="body" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
-          <textarea id="body" v-model="body" rows="10" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+        <div class="mb-6">
+          <label for="body" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Message</label>
+          <textarea 
+            id="body" 
+            v-model="body" 
+            rows="12" 
+            class="block w-full bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:focus:ring-indigo-400 text-gray-900 dark:text-gray-100 px-4 py-3 transition-all duration-200 resize-none" 
+            placeholder="Write your message here..."
+          ></textarea>
         </div>
-        <div class="flex justify-end space-x-2">
-          <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Send</button>
+        <div class="flex justify-end gap-3">
+          <button 
+            type="button" 
+            @click="closeModal" 
+            class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 font-semibold transition-all duration-200"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Send Message
+          </button>
         </div>
       </form>
     </div>

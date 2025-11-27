@@ -1,4 +1,4 @@
-# Gemini Code Understanding
+# Agents
 
 This document outlines the key aspects of the `email-explorer` project to facilitate understanding and future development.
 

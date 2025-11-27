@@ -1,26 +1,62 @@
 <template>
-  <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-6">Mailboxes</h1>
-    <div v-if="mailboxes.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="mailbox in mailboxes" :key="mailbox.id" class="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-        <router-link :to="{ name: 'Mailbox', params: { mailboxId: mailbox.id } }" class="block p-6">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ mailbox.name }}</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ mailbox.email }}</p>
-        </router-link>
-      </div>
+  <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+    <div class="mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent mb-2">Mailboxes</h1>
+      <p class="text-gray-600 dark:text-gray-400">Manage your email accounts</p>
     </div>
-    <div v-else class="text-center bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
-      <h2 class="text-xl font-semibold text-gray-900 dark:text-white">No mailboxes found</h2>
-      <p class="text-gray-600 dark:text-gray-400 mt-2">
+    <div v-if="mailboxes.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <router-link 
+        v-for="mailbox in mailboxes" 
+        :key="mailbox.id" 
+        :to="{ name: 'Mailbox', params: { mailboxId: mailbox.id } }"
+        class="group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-500 dark:hover:border-indigo-400"
+      >
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="relative p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+              {{ mailbox.name.charAt(0).toUpperCase() }}
+            </div>
+            <svg class="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transform group-hover:translate-x-1 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors duration-300">{{ mailbox.name }}</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            {{ mailbox.email }}
+          </p>
+        </div>
+      </router-link>
+    </div>
+    <div v-else class="text-center bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-xl p-12 border border-gray-200 dark:border-gray-700">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">No mailboxes found</h2>
+      <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
         Get started by setting up email routing to send emails into this worker.
       </p>
-      <p class="text-gray-600 dark:text-gray-400 mt-4">
-        To configure, you need to add a DNS record to your domain to allow Cloudflare to route your emails.
-        Follow the instructions on the
-        <a href="https://developers.cloudflare.com/email-routing/setup/email-routing-addresses/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 dark:text-indigo-400 hover:underline">
-          Cloudflare Email Routing documentation
-        </a>.
-      </p>
+      <div class="bg-indigo-50 dark:bg-gray-800 rounded-lg p-6 max-w-2xl mx-auto border border-indigo-200 dark:border-gray-700">
+        <p class="text-gray-700 dark:text-gray-300 mb-2">
+          To configure, you need to add a DNS record to your domain to allow Cloudflare to route your emails.
+        </p>
+        <a 
+          href="https://developers.cloudflare.com/email-routing/setup/email-routing-addresses/" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="inline-flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors duration-200"
+        >
+          View Cloudflare Email Routing documentation
+          <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
     </div>
   </div>
 </template>
