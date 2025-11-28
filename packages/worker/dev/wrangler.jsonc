@@ -29,8 +29,7 @@
 	],
 	"send_email": [
 		{
-			"name": "SEND_EMAIL",
-			"destination_address": "test@exmaple.com"
+			"name": "SEND_EMAIL"
 		}
 	],
 	"durable_objects": {

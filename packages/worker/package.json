@@ -49,18 +49,18 @@
 	},
 	"dependencies": {
 		"chanfana": "2.8.3",
-		"hono": "4.10.3",
-		"mimetext": "^3.0.27",
-		"postal-mime": "^2.6.0",
+		"hono": "4.10.7",
+		"postal-mime": "^2.6.1",
 		"workers-qb": "^1.11.2",
 		"zod": "^3.25.76"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.10.0",
-		"@cloudflare/workers-types": "^4.20251014.0",
-		"@types/node": "24.9.1",
-		"tsup": "^8.5.0",
+		"@cloudflare/vitest-pool-workers": "^0.10.11",
+		"@cloudflare/workers-types": "^4.20251128.0",
+		"@types/node": "24.10.1",
+		"tsup": "^8.5.1",
 		"typescript": "5.9.3",
-		"wrangler": "^4.45.0"
+		"vitest": "^3.2.4",
+		"wrangler": "^4.51.0"
 	}
 }

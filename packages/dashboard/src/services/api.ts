@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useAuthStore } from "@/stores/auth";
 
 const apiClient = axios.create({
 	baseURL: "",
@@ -7,7 +8,55 @@ const apiClient = axios.create({
 	},
 });
 
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+	(config) => {
+		const session = localStorage.getItem("session");
+		if (session) {
+			try {
+				const parsed = JSON.parse(session);
+				config.headers.Authorization = `Bearer ${parsed.id}`;
+			} catch (e) {
+				// Invalid session, ignore
+			}
+		}
+		return config;
+	},
+	(error) => Promise.reject(error),
+);
+
+// Response interceptor to handle 401
+apiClient.interceptors.response.use(
+	(response) => response,
+	async (error) => {
+		if (error.response?.status === 401) {
+			// Clear auth and redirect to login
+			localStorage.removeItem("session");
+			if (window.location.pathname !== "/login") {
+				window.location.href = "/login";
+			}
+		}
+		return Promise.reject(error);
+	},
+);
+
 export default {
+	// Auth
+	register: (email: string, password: string) =>
+		apiClient.post("/api/v1/auth/register", { email, password }),
+	login: (email: string, password: string) =>
+		apiClient.post("/api/v1/auth/login", { email, password }),
+	logout: () => apiClient.post("/api/v1/auth/logout"),
+	getCurrentUser: () => apiClient.get("/api/v1/auth/me"),
+
+	// Set/clear auth token manually
+	setAuthToken: (token: string) => {
+		apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+	},
+	clearAuthToken: () => {
+		delete apiClient.defaults.headers.common["Authorization"];
+	},
+
 	// Mailboxes
 	listMailboxes: () => apiClient.get("/api/v1/mailboxes"),
 	getMailbox: (mailboxId: string) =>
@@ -61,4 +110,13 @@ export default {
 	// Search
 	searchEmails: (mailboxId: string, params: any) =>
 		apiClient.get(`/api/v1/mailboxes/${mailboxId}/search`, { params }),
+
+	// Admin
+	adminRegisterUser: (email: string, password: string) =>
+		apiClient.post("/api/v1/auth/admin/register", { email, password }),
+	adminListUsers: () => apiClient.get("/api/v1/auth/admin/users"),
+	adminGrantAccess: (userId: string, mailboxId: string, role: string) =>
+		apiClient.post("/api/v1/auth/admin/grant-access", { userId, mailboxId, role }),
+	adminRevokeAccess: (userId: string, mailboxId: string) =>
+		apiClient.post("/api/v1/auth/admin/revoke-access", { userId, mailboxId }),
 };

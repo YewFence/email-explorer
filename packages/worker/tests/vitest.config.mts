@@ -7,12 +7,12 @@ export default defineWorkersConfig({
 	test: {
 		poolOptions: {
 			workers: {
-				singleWorker: true,
+				// singleWorker: true,
 				wrangler: {
-					configPath: "../wrangler.jsonc",
+					configPath: "../dev/wrangler.jsonc",
 				},
 				miniflare: {
-					compatibilityFlags: ["experimental", "nodejs_compat"],
+					compatibilityFlags: ["nodejs_compat", "nodejs_als"],
 				},
 			},
 		},

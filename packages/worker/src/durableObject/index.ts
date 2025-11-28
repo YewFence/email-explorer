@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { DOQB } from "workers-qb";
-import type { Env } from "../types";
-import { migrations } from "./migrations";
+import type { Env, Session, User } from "../types";
+import { authMigrations, mailboxMigrations } from "./migrations";
 
 interface GetEmailsOptions {
 	folder?: string;
@@ -35,12 +35,290 @@ interface AttachmentData {
 export class MailboxDO extends DurableObject<Env> {
 	declare __DURABLE_OBJECT_BRAND: never;
 	#qb: DOQB;
+	#isAuthDO: boolean;
 
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
 		this.#qb = new DOQB(this.ctx.storage.sql);
-		this.#qb.setDebugger(true);
-		this.#qb.migrations({ migrations }).apply();
+		// this.#qb.setDebugger(true);
+
+		// Detect if this is the auth singleton
+		// We use a marker in storage to identify the auth DO
+		const authMarker = this.ctx.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").toArray();
+		const hasAuthTables = authMarker.length > 0;
+
+		// Check if this is first initialization
+		const isFirstInit = this.ctx.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'").toArray().length === 0;
+
+		// If first init, check the ID to determine type
+		// idFromName creates deterministic IDs, so we check if this ID matches the expected AUTH ID
+		if (isFirstInit) {
+			// Create a test ID to compare
+			const testAuthId = env.MAILBOX.idFromName("AUTH");
+			this.#isAuthDO = this.ctx.id.equals(testAuthId);
+		} else {
+			// On subsequent loads, check if auth tables exist
+			this.#isAuthDO = hasAuthTables;
+		}
+
+		// Apply appropriate migrations
+		if (this.#isAuthDO) {
+			this.#qb.migrations({ migrations: authMigrations }).apply();
+		} else {
+			this.#qb.migrations({ migrations: mailboxMigrations }).apply();
+		}
+	}
+
+	// Auth helper: hash password using Web Crypto API
+	async #hashPassword(password: string): Promise<string> {
+		const encoder = new TextEncoder();
+		const data = encoder.encode(password);
+		const hash = await crypto.subtle.digest("SHA-256", data);
+		const hashArray = Array.from(new Uint8Array(hash));
+		return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+	}
+
+	// Auth helper: verify password
+	async #verifyPassword(password: string, hash: string): Promise<boolean> {
+		const passwordHash = await this.#hashPassword(password);
+		return passwordHash === hash;
+	}
+
+	// Auth helper: generate session token
+	#generateToken(): string {
+		return crypto.randomUUID();
+	}
+
+	// Auth operation: check if any users exist
+	async hasUsers(): Promise<boolean> {
+		if (!this.#isAuthDO) return false;
+		const result = this.#qb
+			.select("users")
+			.fields(["COUNT(*) as count"])
+			.one();
+		return (result.results?.count as number) > 0;
+	}
+
+	// Auth operation: check if user is admin
+	async isAdmin(userId: string): Promise<boolean> {
+		if (!this.#isAuthDO) return false;
+		const result = this.#qb
+			.select("users")
+			.fields(["is_admin"])
+			.where("id = ?", userId)
+			.one();
+		return result.results?.is_admin === 1;
+	}
+
+	// Auth operation: register a user
+	async register(email: string, password: string, isFirstUser = false): Promise<User> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const userId = crypto.randomUUID();
+		const passwordHash = await this.#hashPassword(password);
+		const now = Date.now();
+
+		this.#qb
+			.insert({
+				tableName: "users",
+				data: {
+					id: userId,
+					email,
+					password_hash: passwordHash,
+					is_admin: isFirstUser ? 1 : 0,
+					created_at: now,
+					updated_at: now,
+				},
+			})
+			.execute();
+
+		return {
+			id: userId,
+			email,
+			isAdmin: isFirstUser,
+			createdAt: now,
+			updatedAt: now,
+		};
+	}
+
+	// Auth operation: login
+	async login(email: string, password: string): Promise<Session | null> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const result = this.#qb
+			.select("users")
+			.fields(["id", "email", "password_hash", "is_admin"])
+			.where("email = ?", email)
+			.one();
+
+		if (!result.results) return null;
+
+		const user = result.results;
+		const isValid = await this.#verifyPassword(password, String(user.password_hash));
+
+		if (!isValid) return null;
+
+		// Create session (30 days expiry)
+		const sessionId = this.#generateToken();
+		const now = Date.now();
+		const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+
+		this.#qb
+			.insert({
+				tableName: "sessions",
+				data: {
+					id: sessionId,
+					user_id: String(user.id),
+					expires_at: expiresAt,
+					created_at: now,
+				},
+			})
+			.execute();
+
+		return {
+			id: sessionId,
+			userId: String(user.id),
+			email: String(user.email),
+			isAdmin: user.is_admin === 1,
+			expiresAt,
+		};
+	}
+
+	// Auth operation: validate session
+	async validateSession(sessionId: string): Promise<Session | null> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const result = this.#qb
+			.select("sessions")
+			.fields(["id", "user_id", "expires_at"])
+			.where("id = ?", sessionId)
+			.one();
+
+		if (!result.results) return null;
+
+		const session = result.results;
+		const expiresAt = Number(session.expires_at);
+
+		// Check if expired
+		if (expiresAt < Date.now()) {
+			this.#qb
+				.delete({
+					tableName: "sessions",
+					where: {
+						conditions: "id = ?",
+						params: [sessionId],
+					},
+				})
+				.execute();
+			return null;
+		}
+
+		// Get user info
+		const userResult = this.#qb
+			.select("users")
+			.fields(["email", "is_admin"])
+			.where("id = ?", String(session.user_id))
+			.one();
+
+		if (!userResult.results) return null;
+
+		return {
+			id: String(session.id),
+			userId: String(session.user_id),
+			email: String(userResult.results.email),
+			isAdmin: userResult.results.is_admin === 1,
+			expiresAt,
+		};
+	}
+
+	// Auth operation: logout
+	async logout(sessionId: string): Promise<boolean> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		this.#qb
+			.delete({
+				tableName: "sessions",
+				where: {
+					conditions: "id = ?",
+					params: [sessionId],
+				},
+			})
+			.execute();
+
+		return true;
+	}
+
+	// Auth operation: get all users (admin only)
+	async getUsers(): Promise<User[]> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const result = this.#qb
+			.select("users")
+			.fields(["id", "email", "is_admin", "created_at", "updated_at"])
+			.execute();
+
+		return (
+			result.results?.map((user) => ({
+				id: String(user.id),
+				email: String(user.email),
+				isAdmin: user.is_admin === 1,
+				createdAt: Number(user.created_at),
+				updatedAt: Number(user.updated_at),
+			})) ?? []
+		);
+	}
+
+	// Auth operation: grant mailbox access
+	async grantMailboxAccess(
+		userId: string,
+		mailboxId: string,
+		role: string,
+	): Promise<void> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		this.#qb
+			.insert({
+				tableName: "user_mailboxes",
+				data: {
+					user_id: userId,
+					mailbox_id: mailboxId,
+					role,
+				},
+			})
+			.execute();
+	}
+
+	// Auth operation: revoke mailbox access
+	async revokeMailboxAccess(userId: string, mailboxId: string): Promise<void> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		this.#qb
+			.delete({
+				tableName: "user_mailboxes",
+				where: {
+					conditions: "user_id = ? AND mailbox_id = ?",
+					params: [userId, mailboxId],
+				},
+			})
+			.execute();
+	}
+
+	// Auth operation: get user mailboxes
+	async getUserMailboxes(userId: string): Promise<Array<{ mailboxId: string; role: string }>> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const result = this.#qb
+			.select("user_mailboxes")
+			.fields(["mailbox_id", "role"])
+			.where("user_id = ?", userId)
+			.execute();
+
+		return (
+			result.results?.map((row) => ({
+				mailboxId: String(row.mailbox_id),
+				role: String(row.role),
+			})) ?? []
+		);
 	}
 
 	async getEmails(options: GetEmailsOptions = {}) {

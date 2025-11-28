@@ -1,6 +1,6 @@
 import type { Migration } from "workers-qb";
 
-export const migrations: Migration[] = [
+export const mailboxMigrations: Migration[] = [
 	{
 		name: "1_initial_setup",
 		sql: `
@@ -46,6 +46,41 @@ export const migrations: Migration[] = [
                 disposition TEXT,
                 FOREIGN KEY(email_id) REFERENCES emails(id) ON DELETE CASCADE
             );
+        `,
+	},
+];
+
+export const authMigrations: Migration[] = [
+	{
+		name: "1_auth_setup",
+		sql: `
+            CREATE TABLE users (
+                id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE user_mailboxes (
+                user_id TEXT NOT NULL,
+                mailbox_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                PRIMARY KEY (user_id, mailbox_id)
+            );
+
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+            CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+            CREATE INDEX idx_user_mailboxes_user_id ON user_mailboxes(user_id);
+            CREATE INDEX idx_user_mailboxes_mailbox_id ON user_mailboxes(mailbox_id);
         `,
 	},
 ];

@@ -2,12 +2,23 @@ import { EmailMessage } from "cloudflare:email";
 import { contentJson, fromHono, OpenAPIRoute } from "chanfana";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
-import { createMimeMessage } from "mimetext";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import type { Env } from "./types";
+import { buildMimeMessage } from "./mime-builder";
+import type { Env, EmailExplorerOptions, Session } from "./types";
+import {
+	GetMe,
+	GetUsers,
+	PostAdminRegister,
+	PostGrantAccess,
+	PostLogin,
+	PostLogout,
+	PostRegister,
+	PostRevokeAccess,
+	PutUser,
+} from "./routes/auth";
 
-type AppContext = Context<{ Bindings: Env }>;
+type AppContext = Context<{ Bindings: Env; Variables: { session?: Session } }>;
 
 export { MailboxDO } from "./durableObject";
 
@@ -59,7 +70,7 @@ const EmailSchema = EmailMetadataSchema.extend({
 
 const SendEmailRequestSchema = z
 	.object({
-		to: z.string().email(),
+		to: z.union([z.string().email(), z.array(z.string().email())]),
 		from: z.string().email(),
 		subject: z.string(),
 		html: z.string().optional(),
@@ -370,37 +381,33 @@ class PostEmail extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 
-		const msg = createMimeMessage();
-		msg.setSender({ name: from, addr: from });
-		msg.setRecipient(to);
-		msg.setSubject(subject);
-		if (text) {
-			msg.addMessage({
-				contentType: "text/plain",
-				data: text,
-			});
-		}
-		if (html) {
-			msg.addMessage({
-				contentType: "text/html",
-				data: html,
-			});
-		}
-		if (attachments) {
-			for (const att of attachments) {
-				msg.addAttachment({
-					filename: att.filename,
-					contentType: att.type,
-					data: att.content,
-					encoding: "base64",
-					inline: att.disposition === "inline",
-				});
-			}
-		}
+		// Normalize 'to' to string (EmailMessage expects string)
+		const toStr = Array.isArray(to) ? to[0] : to;
 
-		const message = new EmailMessage(from, to, msg.asRaw());
+		// Build MIME message using Workers-compatible builder
+		const mimeMessage = buildMimeMessage({
+			from,
+			to,
+			subject,
+			text,
+			html,
+			attachments: attachments?.map(att => ({
+				filename: att.filename,
+				content: att.content,
+				type: att.type,
+				disposition: att.disposition,
+				contentId: att.contentId,
+			})),
+		});
 
-		await c.env.SEND_EMAIL.send(message);
+		const message = new EmailMessage(from, toStr, mimeMessage);
+
+        try {
+            await c.env.SEND_EMAIL.send(message);
+        } catch (e) {
+            return c.json({ error: (e as Error).message }, 500);
+        }
+
 		const messageId = crypto.randomUUID();
 
 		const ns = c.env.MAILBOX;
@@ -431,7 +438,7 @@ class PostEmail extends OpenAPIRoute {
 				id: messageId,
 				subject,
 				sender: from,
-				recipient: to,
+				recipient: toStr,
 				date: new Date().toISOString(),
 				body: html || text || "",
 			},
@@ -1122,10 +1129,77 @@ class CreateDummyMailbox extends OpenAPIRoute {
 	}
 }
 
-const app = new Hono<{ Bindings: Env }>();
+// Helper function to extract session token
+function getSessionToken(request: Request): string | null {
+	// Try Authorization header first
+	const authHeader = request.headers.get("Authorization");
+	if (authHeader?.startsWith("Bearer ")) {
+		return authHeader.substring(7);
+	}
+
+	// Try cookie
+	const cookie = request.headers.get("Cookie");
+	if (cookie) {
+		const match = cookie.match(/session=([^;]+)/);
+		return match ? match[1] : null;
+	}
+
+	return null;
+}
+
+// Helper function to validate session
+async function validateSession(request: Request, env: Env): Promise<Session | null> {
+	const token = getSessionToken(request);
+	if (!token) return null;
+
+	const authId = env.MAILBOX.idFromName("AUTH");
+	const authDO = env.MAILBOX.get(authId);
+
+	try {
+		const session = await authDO.validateSession(token);
+		return session;
+	} catch {
+		return null;
+	}
+}
+
+// Helper function to check if route is public
+function isPublicRoute(pathname: string): boolean {
+	const publicRoutes = [
+		"/api/v1/auth/register",
+		"/api/v1/auth/login",
+		"/api/docs",
+		"/api/openapi.json",
+	];
+	return publicRoutes.some((route) => pathname.startsWith(route));
+}
+
+// Helper function to check if route requires session (auth routes)
+function requiresSession(pathname: string): boolean {
+	const authRoutes = [
+		"/api/v1/auth/me",
+		"/api/v1/auth/logout",
+		"/api/v1/auth/admin",
+	];
+	return authRoutes.some((route) => pathname.startsWith(route));
+}
+
+const app = new Hono<{ Bindings: Env; Variables: { session?: Session } }>();
 app.use("/api/*", cors());
 const openapi = fromHono(app);
 
+// Auth endpoints
+openapi.post("/api/v1/auth/register", PostRegister);
+openapi.post("/api/v1/auth/login", PostLogin);
+openapi.post("/api/v1/auth/logout", PostLogout);
+openapi.get("/api/v1/auth/me", GetMe);
+openapi.post("/api/v1/auth/admin/register", PostAdminRegister);
+openapi.get("/api/v1/auth/admin/users", GetUsers);
+openapi.put("/api/v1/auth/admin/users/:userId", PutUser);
+openapi.post("/api/v1/auth/admin/grant-access", PostGrantAccess);
+openapi.post("/api/v1/auth/admin/revoke-access", PostRevokeAccess);
+
+// Existing endpoints
 openapi.post("/api/v1/debug/create-mailbox", CreateDummyMailbox);
 openapi.get("/api/v1/mailboxes", GetMailboxes);
 openapi.get("/api/v1/mailboxes/:mailboxId", GetMailbox);
@@ -1231,7 +1305,22 @@ async function receiveEmail(
 	);
 }
 
-export function EmailExplorer(_options = {}) {
+const defaultOptions: EmailExplorerOptions = {
+	auth: {
+		enabled: true, // Auth is enabled by default for security
+		registerEnabled: undefined, // Smart mode: first user becomes admin, then registration closes
+	},
+};
+
+export function EmailExplorer(_options: EmailExplorerOptions = {}) {
+	// Merge user options with defaults
+	const options: EmailExplorerOptions = {
+		auth: {
+			...defaultOptions.auth,
+			..._options.auth,
+		},
+	};
+
 	return {
 		async email(
 			event: { raw: ReadableStream; rawSize: number },
@@ -1241,6 +1330,46 @@ export function EmailExplorer(_options = {}) {
 			await receiveEmail(event, env, context);
 		},
 		async fetch(request: Request, env: Env, context: ExecutionContext) {
+			// Make options available to routes via env
+			env.config = options;
+
+			// Create a new request with context for middleware
+			const url = new URL(request.url);
+
+			// Check if auth is required (either globally enabled or auth-specific routes)
+			// Auth is enforced by default (when enabled is undefined) unless explicitly disabled
+			const needsAuth = (options.auth?.enabled !== false && !isPublicRoute(url.pathname)) || requiresSession(url.pathname);
+
+			if (needsAuth) {
+				const session = await validateSession(request, env);
+				if (!session) {
+					return new Response(
+						JSON.stringify({ error: "Unauthorized" }),
+						{
+							status: 401,
+							headers: { "Content-Type": "application/json" },
+						},
+					);
+				}
+
+				// Create new Hono app with session in context
+				const authApp = new Hono<{
+					Bindings: Env;
+					Variables: { session?: Session };
+				}>();
+
+				// Middleware to inject session
+				authApp.use("*", async (c, next) => {
+					c.set("session", session);
+					await next();
+				});
+
+				// Mount the main app
+				authApp.route("/", app);
+
+				return authApp.fetch(request, env, context);
+			}
+
 			return app.fetch(request, env, context);
 		},
 	};
