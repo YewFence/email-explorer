@@ -1,5 +1,5 @@
-import { EmailExplorer } from "email-explorer";
-export { MailboxDO } from "email-explorer";
+import { EmailExplorer } from "../src";
+export { MailboxDO } from "../src";
 
 export default EmailExplorer({
 	// Settings here

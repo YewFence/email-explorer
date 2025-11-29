@@ -24,7 +24,7 @@
 			"binding": "BUCKET",
 			"bucket_name": "email-explorer",
 			"preview_bucket_name": "email-explorer",
-			"remote": true
+//			"remote": true
 		}
 	],
 	"send_email": [

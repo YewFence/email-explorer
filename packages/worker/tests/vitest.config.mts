@@ -7,11 +7,13 @@ export default defineWorkersConfig({
 	test: {
 		poolOptions: {
 			workers: {
-				// singleWorker: true,
+				singleWorker: true,
 				wrangler: {
 					configPath: "../dev/wrangler.jsonc",
 				},
 				miniflare: {
+					r2Persist: false,
+					isolatedStorage: true,
 					compatibilityFlags: ["nodejs_compat", "nodejs_als"],
 					serviceBindings: {
 						async SEND_EMAIL() {
