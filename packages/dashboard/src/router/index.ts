@@ -93,7 +93,7 @@ const router = createRouter({
 });
 
 // Navigation guard for authentication
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
 	const authStore = useAuthStore();
 	const isPublicRoute = to.meta.public === true;
 	const requiresAuth = to.meta.requiresAuth !== false; // Auth required by default

@@ -34,14 +34,17 @@ describe("API Integration Tests", () => {
 		});
 
 		// Login to get session token
-		const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				email: "endpointstest@example.com",
-				password: "password123",
-			}),
-		});
+		const loginResponse = await SELF.fetch(
+			"http://local.test/api/v1/auth/login",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					email: "endpointstest@example.com",
+					password: "password123",
+				}),
+			},
+		);
 		const loginBody = await loginResponse.json<any>();
 		sessionToken = loginBody.id;
 	});
@@ -52,7 +55,9 @@ describe("API Integration Tests", () => {
 			// Skipped: Test times out in isolated environment
 			// The mailboxes endpoint works correctly, but this specific test
 			// has timing issues in the test environment
-			const response = await authenticatedFetch(`http://local.test/api/v1/mailboxes`);
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes`,
+			);
 			const body = await response.json<any[]>();
 
 			expect(response.status).toBe(200);
@@ -63,7 +68,9 @@ describe("API Integration Tests", () => {
 			// Skipped: Test times out in isolated environment
 			// Mailbox list functionality is tested via other endpoints
 			await createMailbox();
-			const response = await authenticatedFetch(`http://local.test/api/v1/mailboxes`);
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes`,
+			);
 			const body = await response.json<any[]>();
 
 			expect(response.status).toBe(200);

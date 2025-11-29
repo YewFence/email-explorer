@@ -17,7 +17,11 @@ describe("Authentication & User Management Integration Tests", () => {
 	};
 
 	// Helper to make authenticated request
-	const authenticatedFetch = (url: string, sessionToken: string, options: RequestInit = {}) => {
+	const authenticatedFetch = (
+		url: string,
+		sessionToken: string,
+		options: RequestInit = {},
+	) => {
 		return SELF.fetch(url, {
 			...options,
 			headers: {
@@ -29,14 +33,17 @@ describe("Authentication & User Management Integration Tests", () => {
 
 	describe("Registration Flow", () => {
 		it("should allow first user registration and make them admin", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "admin@example.com",
-					password: "password123",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "admin@example.com",
+						password: "password123",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(201);
 			const body = await response.json<any>();
@@ -49,14 +56,17 @@ describe("Authentication & User Management Integration Tests", () => {
 		});
 
 		it("should reject registration with weak password", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "user@example.com",
-					password: "weak",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "user@example.com",
+						password: "weak",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(400);
 		});
@@ -73,14 +83,17 @@ describe("Authentication & User Management Integration Tests", () => {
 			});
 
 			// Try to register same email again
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "duplicate@example.com",
-					password: "password456",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "duplicate@example.com",
+						password: "password456",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(403);
 			const body = await response.json<any>();
@@ -99,14 +112,17 @@ describe("Authentication & User Management Integration Tests", () => {
 			});
 
 			// Try to register second user via public endpoint
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "second@example.com",
-					password: "password123",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "second@example.com",
+						password: "password123",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(403);
 			const body = await response.json<any>();
@@ -206,21 +222,24 @@ describe("Authentication & User Management Integration Tests", () => {
 				}),
 			});
 
-			const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "session@example.com",
-					password: "password123",
-				}),
-			});
+			const loginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "session@example.com",
+						password: "password123",
+					}),
+				},
+			);
 			const loginBody = await loginResponse.json<any>();
 			const sessionToken = loginBody.id;
 
 			// Get current user
 			const response = await authenticatedFetch(
 				"http://local.test/api/v1/auth/me",
-				sessionToken
+				sessionToken,
 			);
 
 			expect(response.status).toBe(200);
@@ -234,7 +253,7 @@ describe("Authentication & User Management Integration Tests", () => {
 		it("should reject request with invalid session", async () => {
 			const response = await authenticatedFetch(
 				"http://local.test/api/v1/auth/me",
-				"invalid-session-token"
+				"invalid-session-token",
 			);
 
 			expect(response.status).toBe(401);
@@ -251,24 +270,30 @@ describe("Authentication & User Management Integration Tests", () => {
 				}),
 			});
 
-			const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "logout@example.com",
-					password: "password123",
-				}),
-			});
+			const loginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "logout@example.com",
+						password: "password123",
+					}),
+				},
+			);
 			const loginBody = await loginResponse.json<any>();
 			const sessionToken = loginBody.id;
 
 			// Logout
-			const logoutResponse = await SELF.fetch("http://local.test/api/v1/auth/logout", {
-				method: "POST",
-				headers: {
-					Cookie: `session=${sessionToken}`,
+			const logoutResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/logout",
+				{
+					method: "POST",
+					headers: {
+						Cookie: `session=${sessionToken}`,
+					},
 				},
-			});
+			);
 
 			expect(logoutResponse.status).toBe(200);
 			const setCookie = logoutResponse.headers.get("Set-Cookie");
@@ -277,7 +302,7 @@ describe("Authentication & User Management Integration Tests", () => {
 			// Try to use session after logout
 			const meResponse = await authenticatedFetch(
 				"http://local.test/api/v1/auth/me",
-				sessionToken
+				sessionToken,
 			);
 			expect(meResponse.status).toBe(401);
 		});
@@ -297,14 +322,17 @@ describe("Authentication & User Management Integration Tests", () => {
 				}),
 			});
 
-			const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "testadmin@example.com",
-					password: "adminpass123",
-				}),
-			});
+			const loginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "testadmin@example.com",
+						password: "adminpass123",
+					}),
+				},
+			);
 			const loginBody = await loginResponse.json<any>();
 			adminSessionToken = loginBody.id;
 		});
@@ -320,7 +348,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "newuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -332,14 +360,17 @@ describe("Authentication & User Management Integration Tests", () => {
 		});
 
 		it("should reject admin registration without authentication", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/admin/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "noauth@example.com",
-					password: "password123",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/admin/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "noauth@example.com",
+						password: "password123",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(401);
 		});
@@ -356,13 +387,13 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "listuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 
 			// List users
 			const response = await authenticatedFetch(
 				"http://local.test/api/v1/auth/admin/users",
-				adminSessionToken
+				adminSessionToken,
 			);
 
 			expect(response.status).toBe(200);
@@ -384,7 +415,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "accessuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 			const user = await registerResponse.json<any>();
 
@@ -400,7 +431,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						mailboxId: "mailbox@example.com",
 						role: "read",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(200);
@@ -420,7 +451,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "revokeuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 			const user = await registerResponse.json<any>();
 
@@ -435,7 +466,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						mailboxId: "mailbox@example.com",
 						role: "write",
 					}),
-				}
+				},
 			);
 
 			// Revoke access
@@ -449,7 +480,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						userId: user.id,
 						mailboxId: "mailbox@example.com",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(200);
@@ -469,7 +500,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "roleuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 			const user = await registerResponse.json<any>();
 
@@ -487,7 +518,7 @@ describe("Authentication & User Management Integration Tests", () => {
 							mailboxId: `mailbox-${role}@example.com`,
 							role,
 						}),
-					}
+					},
 				);
 				expect(response.status).toBe(200);
 			}
@@ -504,7 +535,7 @@ describe("Authentication & User Management Integration Tests", () => {
 						mailboxId: "mailbox@example.com",
 						role: "invalid-role",
 					}),
-				}
+				},
 			);
 			expect(invalidResponse.status).toBe(400);
 		});
@@ -522,14 +553,17 @@ describe("Authentication & User Management Integration Tests", () => {
 				}),
 			});
 
-			const adminLoginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "permadmin@example.com",
-					password: "password123",
-				}),
-			});
+			const adminLoginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "permadmin@example.com",
+						password: "password123",
+					}),
+				},
+			);
 			const adminBody = await adminLoginResponse.json<any>();
 			const adminToken = adminBody.id;
 
@@ -544,25 +578,28 @@ describe("Authentication & User Management Integration Tests", () => {
 						email: "regularuser@example.com",
 						password: "password123",
 					}),
-				}
+				},
 			);
 
 			// Login as regular user
-			const userLoginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "regularuser@example.com",
-					password: "password123",
-				}),
-			});
+			const userLoginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "regularuser@example.com",
+						password: "password123",
+					}),
+				},
+			);
 			const userBody = await userLoginResponse.json<any>();
 			const userToken = userBody.id;
 
 			// Try to access admin endpoint with regular user token
 			const response = await authenticatedFetch(
 				"http://local.test/api/v1/auth/admin/users",
-				userToken
+				userToken,
 			);
 
 			expect(response.status).toBe(403);
@@ -573,14 +610,17 @@ describe("Authentication & User Management Integration Tests", () => {
 
 	describe("Security", () => {
 		it("should not expose password hash in responses", async () => {
-			const registerResponse = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "security@example.com",
-					password: "password123",
-				}),
-			});
+			const registerResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "security@example.com",
+						password: "password123",
+					}),
+				},
+			);
 
 			const registerBody = await registerResponse.json<any>();
 			expect(registerBody.password).toBeUndefined();
@@ -588,14 +628,17 @@ describe("Authentication & User Management Integration Tests", () => {
 			expect(registerBody.passwordHash).toBeUndefined();
 
 			// Login and check session response
-			const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "security@example.com",
-					password: "password123",
-				}),
-			});
+			const loginResponse = await SELF.fetch(
+				"http://local.test/api/v1/auth/login",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "security@example.com",
+						password: "password123",
+					}),
+				},
+			);
 
 			const loginBody = await loginResponse.json<any>();
 			expect(loginBody.password).toBeUndefined();
@@ -629,11 +672,14 @@ describe("Authentication & User Management Integration Tests", () => {
 		});
 
 		it("should reject requests with invalid JSON", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: "invalid json{",
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: "invalid json{",
+				},
+			);
 
 			expect(response.status).toBe(400);
 		});
@@ -662,34 +708,40 @@ describe("Authentication & User Management Integration Tests", () => {
 			];
 
 			const responses = await Promise.all(promises);
-			
+
 			// One should succeed (become admin), one should fail (registration closed)
 			const statuses = responses.map((r) => r.status);
 			expect(statuses).toContain(201); // At least one success
 		});
 
 		it("should handle missing fields in requests", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "incomplete@example.com",
-					// password missing
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "incomplete@example.com",
+						// password missing
+					}),
+				},
+			);
 
 			expect(response.status).toBe(400);
 		});
 
 		it("should handle empty email or password", async () => {
-			const response = await SELF.fetch("http://local.test/api/v1/auth/register", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					email: "",
-					password: "",
-				}),
-			});
+			const response = await SELF.fetch(
+				"http://local.test/api/v1/auth/register",
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						email: "",
+						password: "",
+					}),
+				},
+			);
 
 			expect(response.status).toBe(400);
 		});

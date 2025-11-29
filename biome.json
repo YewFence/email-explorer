@@ -30,7 +30,11 @@
 			},
 			"style": {
 				"noParameterAssign": "off",
-				"useExponentiationOperator": "off"
+				"useExponentiationOperator": "off",
+				"useTemplate": "off"
+			},
+			"correctness": {
+				"noUnusedVariables": "off"
 			},
 			"complexity": {
 				"noForEach": "off",

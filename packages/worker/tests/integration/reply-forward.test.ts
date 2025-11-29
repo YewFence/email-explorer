@@ -19,23 +19,29 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 	beforeEach(async () => {
 		// Setup: Create admin user and get session
-		const registerResponse = await SELF.fetch("http://local.test/api/v1/auth/register", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				email: "replytest@example.com",
-				password: "password123",
-			}),
-		});
+		const registerResponse = await SELF.fetch(
+			"http://local.test/api/v1/auth/register",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					email: "replytest@example.com",
+					password: "password123",
+				}),
+			},
+		);
 
-		const loginResponse = await SELF.fetch("http://local.test/api/v1/auth/login", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				email: "replytest@example.com",
-				password: "password123",
-			}),
-		});
+		const loginResponse = await SELF.fetch(
+			"http://local.test/api/v1/auth/login",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					email: "replytest@example.com",
+					password: "password123",
+				}),
+			},
+		);
 		const loginBody = await loginResponse.json<any>();
 		sessionToken = loginBody.id;
 
@@ -55,7 +61,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 					text: "This is the original email body",
 					html: "<p>This is the original email body</p>",
 				}),
-			}
+			},
 		);
 
 		const sendBody = await sendResponse.json<any>();
@@ -76,7 +82,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "This is my reply",
 						html: "<p>This is my reply</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -88,14 +94,14 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Verify the reply was stored in sent folder with threading metadata
 			const sentEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`,
 			);
 			const sentEmailBody = await sentEmail.json<any>();
-			
+
 			expect(sentEmailBody.in_reply_to).toBe(originalEmailId);
 			expect(sentEmailBody.thread_id).toBe(originalEmailId);
 			expect(sentEmailBody.email_references).toBeDefined();
-			
+
 			const references = JSON.parse(sentEmailBody.email_references);
 			expect(references).toContain(originalEmailId);
 		});
@@ -114,14 +120,14 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "First reply",
 						html: "<p>First reply</p>",
 					}),
-				}
+				},
 			);
 			const firstReplyBody = await firstReplyResponse.json<any>();
 			const firstReplyId = firstReplyBody.id;
 
 			// Get the first reply to use for second reply
 			const firstReplyEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${firstReplyId}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${firstReplyId}`,
 			);
 			const firstReplyEmailBody = await firstReplyEmail.json<any>();
 
@@ -138,7 +144,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Second reply",
 						html: "<p>Second reply</p>",
 					}),
-				}
+				},
 			);
 
 			expect(secondReplyResponse.status).toBe(201);
@@ -146,12 +152,12 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Verify references chain
 			const secondReplyEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${secondReplyBody.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${secondReplyBody.id}`,
 			);
 			const secondReplyEmailBody = await secondReplyEmail.json<any>();
-			
+
 			expect(secondReplyEmailBody.in_reply_to).toBe(firstReplyId);
-			
+
 			const references = JSON.parse(secondReplyEmailBody.email_references);
 			expect(references).toContain(originalEmailId);
 			expect(references).toContain(firstReplyId);
@@ -170,7 +176,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Reply to nothing",
 						html: "<p>Reply to nothing</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(404);
@@ -191,7 +197,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Unauthenticated reply",
 						html: "<p>Unauthenticated reply</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(401);
@@ -209,7 +215,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						subject: "Re: Original Email",
 						// Missing text and html
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(400);
@@ -230,7 +236,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Forwarded message",
 						html: "<p>Forwarded message</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -242,10 +248,10 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Verify the forwarded email has no threading metadata
 			const forwardedEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`,
 			);
 			const forwardedEmailBody = await forwardedEmail.json<any>();
-			
+
 			expect(forwardedEmailBody.in_reply_to).toBeNull();
 			expect(forwardedEmailBody.email_references).toBeNull();
 			expect(forwardedEmailBody.thread_id).toBe(body.id); // New thread
@@ -264,7 +270,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Forward nothing",
 						html: "<p>Forward nothing</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(404);
@@ -285,7 +291,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Unauthenticated forward",
 						html: "<p>Unauthenticated forward</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(401);
@@ -303,7 +309,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						subject: "Fwd: Original Email",
 						// Missing text and html
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(400);
@@ -325,7 +331,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Reply 1",
 						html: "<p>Reply 1</p>",
 					}),
-				}
+				},
 			);
 			const reply1Body = await reply1Response.json<any>();
 
@@ -341,18 +347,18 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Reply 2",
 						html: "<p>Reply 2</p>",
 					}),
-				}
+				},
 			);
 			const reply2Body = await reply2Response.json<any>();
 
 			// Both replies should have the same thread_id (the original email ID)
 			const reply1Email = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${reply1Body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${reply1Body.id}`,
 			);
 			const reply1EmailBody = await reply1Email.json<any>();
 
 			const reply2Email = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${reply2Body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${reply2Body.id}`,
 			);
 			const reply2EmailBody = await reply2Email.json<any>();
 
@@ -374,19 +380,19 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Test reply",
 						html: "<p>Test reply</p>",
 					}),
-				}
+				},
 			);
 
 			// List emails in sent folder
 			const listResponse = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails?folder=sent`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails?folder=sent`,
 			);
 
 			expect(listResponse.status).toBe(200);
 			const emails = await listResponse.json<any[]>();
-			
+
 			// Find the reply email
-			const replyEmail = emails.find(e => e.subject === "Re: Original Email");
+			const replyEmail = emails.find((e) => e.subject === "Re: Original Email");
 			expect(replyEmail).toBeDefined();
 			expect(replyEmail.in_reply_to).toBeDefined();
 			expect(replyEmail.thread_id).toBeDefined();
@@ -415,7 +421,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 							},
 						],
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -423,10 +429,10 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Verify attachment was stored
 			const replyEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`,
 			);
 			const replyEmailBody = await replyEmail.json<any>();
-			
+
 			expect(replyEmailBody.attachments).toBeDefined();
 			expect(replyEmailBody.attachments.length).toBe(1);
 			expect(replyEmailBody.attachments[0].filename).toBe("test.txt");
@@ -453,7 +459,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 							},
 						],
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -461,10 +467,10 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Verify attachment was stored
 			const forwardEmail = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${body.id}`,
 			);
 			const forwardEmailBody = await forwardEmail.json<any>();
-			
+
 			expect(forwardEmailBody.attachments).toBeDefined();
 			expect(forwardEmailBody.attachments.length).toBe(1);
 			expect(forwardEmailBody.attachments[0].filename).toBe("document.pdf");
@@ -485,7 +491,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Reply to multiple",
 						html: "<p>Reply to multiple</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -504,7 +510,7 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 						text: "Forward to multiple",
 						html: "<p>Forward to multiple</p>",
 					}),
-				}
+				},
 			);
 
 			expect(response.status).toBe(201);
@@ -528,9 +534,9 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 							text: `Reply ${i + 1}`,
 							html: `<p>Reply ${i + 1}</p>`,
 						}),
-					}
+					},
 				);
-				
+
 				expect(replyResponse.status).toBe(201);
 				const replyBody = await replyResponse.json<any>();
 				currentEmailId = replyBody.id;
@@ -539,10 +545,10 @@ describe("Reply & Forward Functionality Integration Tests", () => {
 
 			// Check the last reply has all previous messages in references
 			const lastReply = await authenticatedFetch(
-				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${currentEmailId}`
+				`http://local.test/api/v1/mailboxes/${testMailboxId}/emails/${currentEmailId}`,
 			);
 			const lastReplyBody = await lastReply.json<any>();
-			
+
 			const references = JSON.parse(lastReplyBody.email_references);
 			expect(references.length).toBeGreaterThanOrEqual(5);
 		});
