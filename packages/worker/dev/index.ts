@@ -2,5 +2,9 @@ import { EmailExplorer } from "../src";
 export { MailboxDO } from "../src";
 
 export default EmailExplorer({
-	// Settings here
+	auth: {
+        enabled: true,
+        registerEnabled: true
+    }
+
 });

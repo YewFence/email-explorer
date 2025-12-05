@@ -58,6 +58,8 @@ export default {
 
 	// Mailboxes
 	listMailboxes: () => apiClient.get("/api/v1/mailboxes"),
+	createMailbox: (email: string, name: string, settings?: any) =>
+		apiClient.post("/api/v1/mailboxes", { email, name, settings }),
 	getMailbox: (mailboxId: string) =>
 		apiClient.get(`/api/v1/mailboxes/${mailboxId}`),
 	updateMailbox: (mailboxId: string, settings: any) =>

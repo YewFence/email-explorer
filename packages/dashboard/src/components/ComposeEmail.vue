@@ -85,6 +85,7 @@ import api from "@/services/api";
 import { useEmailStore } from "@/stores/emails";
 import { useMailboxStore } from "@/stores/mailboxes";
 import { useUIStore } from "@/stores/ui";
+import { useToast } from "@/composables/useToast";
 import RichTextEditor from "./RichTextEditor.vue";
 
 const uiStore = useUIStore();
@@ -93,6 +94,7 @@ const emailStore = useEmailStore();
 const mailboxStore = useMailboxStore();
 const { currentMailbox } = storeToRefs(mailboxStore);
 const route = useRoute();
+const { success: showSuccessToast, error: showErrorToast } = useToast();
 
 const to = ref("");
 const subject = ref("");
@@ -140,7 +142,7 @@ watch(isComposeModalOpen, (isOpen) => {
 			subject.value = original.subject.startsWith("Re: ")
 				? original.subject
 				: `Re: ${original.subject}`;
-			body.value = `\n\n---\nOn ${original.date}, ${original.sender} wrote:\n${formatQuotedText(stripHtml(original.body))}`;
+			body.value = `<br><br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${original.date}, ${original.sender} wrote:<br><br>${original.body}</blockquote>`;
 		} else if (options.mode === "reply-all" && original) {
 			// For reply all, include both sender and original recipient
 			const recipients = new Set([original.sender]);
@@ -154,13 +156,19 @@ watch(isComposeModalOpen, (isOpen) => {
 			subject.value = original.subject.startsWith("Re: ")
 				? original.subject
 				: `Re: ${original.subject}`;
-			body.value = `\n\n---\nOn ${original.date}, ${original.sender} wrote:\n${formatQuotedText(stripHtml(original.body))}`;
+			body.value = `<br><br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${original.date}, ${original.sender} wrote:<br><br>${original.body}</blockquote>`;
 		} else if (options.mode === "forward" && original) {
 			to.value = "";
 			subject.value = original.subject.startsWith("Fwd: ")
 				? original.subject
 				: `Fwd: ${original.subject}`;
-			body.value = `\n\n---\nForwarded message:\nFrom: ${original.sender}\nDate: ${original.date}\nSubject: ${original.subject}\n\n${stripHtml(original.body)}`;
+			body.value = `<br><br><div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;">
+<strong>Forwarded message:</strong><br>
+<strong>From:</strong> ${original.sender}<br>
+<strong>Date:</strong> ${original.date}<br>
+<strong>Subject:</strong> ${original.subject}<br><br>
+${original.body}
+</div>`;
 		} else {
 			to.value = "";
 			subject.value = "";
@@ -236,8 +244,11 @@ const send = async () => {
 		subject.value = "";
 		body.value = "";
 		closeModal();
+		showSuccessToast("Email sent successfully!");
 	} catch (e: any) {
-		error.value = e.response?.data?.error || "An unexpected error occurred.";
+		const errorMessage = e.response?.data?.error || "An unexpected error occurred.";
+		error.value = errorMessage;
+		showErrorToast(errorMessage);
 	} finally {
 		isLoading.value = false;
 	}

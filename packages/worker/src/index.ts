@@ -41,6 +41,12 @@ const UpdateMailboxRequestSchema = z.object({
 	settings: z.record(z.any()),
 });
 
+const CreateMailboxRequestSchema = z.object({
+	email: z.string().email(),
+	name: z.string().min(1),
+	settings: z.record(z.any()).optional(),
+});
+
 const ErrorResponseSchema = z.object({
 	error: z.string(),
 });
@@ -298,6 +304,78 @@ class DeleteMailbox extends OpenAPIRoute {
 
 		// TODO: delete durable object
 		return c.body(null, 204);
+	}
+}
+
+class PostMailbox extends OpenAPIRoute {
+	schema = {
+		summary: "Create a new mailbox",
+		operationId: "createMailbox",
+		tags: ["Mailboxes"],
+		request: {
+			body: contentJson(CreateMailboxRequestSchema),
+		},
+		responses: {
+			"201": {
+				description: "Mailbox created successfully",
+				...contentJson(MailboxDetailsSchema),
+			},
+			"400": { description: "Bad request", ...contentJson(ErrorResponseSchema) },
+			"409": { description: "Mailbox already exists", ...contentJson(ErrorResponseSchema) },
+		},
+	};
+
+	async handle(c: AppContext) {
+		const data = await this.getValidatedData<typeof this.schema>();
+		const { email, name, settings } = data.body;
+
+		const key = `mailboxes/${email}.json`;
+
+		// Check if mailbox already exists
+		const existing = await c.env.BUCKET.head(key);
+		if (existing) {
+			return c.json({ error: "Mailbox already exists" }, 409);
+		}
+
+		// Default settings
+		const defaultSettings = {
+			fromName: name,
+			forwarding: {
+				enabled: false,
+				email: "",
+			},
+			signature: {
+				enabled: false,
+				text: "",
+			},
+			autoReply: {
+				enabled: false,
+				subject: "",
+				message: "",
+			},
+		};
+
+		const finalSettings = { ...defaultSettings, ...settings };
+
+		// Save mailbox settings to R2
+		await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
+
+		// Initialize the durable object for this mailbox
+		const ns = c.env.MAILBOX;
+		const id = ns.idFromName(email);
+		const stub = ns.get(id);
+
+		// Trigger first run of the durable object to initialize database
+		await stub.getFolders();
+
+		const response = {
+			id: email,
+			email: email,
+			name: name,
+			settings: finalSettings,
+		};
+
+		return c.json(response, 201);
 	}
 }
 
@@ -1227,6 +1305,7 @@ openapi.post("/api/v1/auth/admin/revoke-access", PostRevokeAccess);
 // Existing endpoints
 openapi.post("/api/v1/debug/create-mailbox", CreateDummyMailbox);
 openapi.get("/api/v1/mailboxes", GetMailboxes);
+openapi.post("/api/v1/mailboxes", PostMailbox);
 openapi.get("/api/v1/mailboxes/:mailboxId", GetMailbox);
 openapi.put("/api/v1/mailboxes/:mailboxId", PutMailbox);
 openapi.delete("/api/v1/mailboxes/:mailboxId", DeleteMailbox);
