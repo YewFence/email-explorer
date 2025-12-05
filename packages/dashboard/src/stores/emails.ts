@@ -6,11 +6,17 @@ export const useEmailStore = defineStore("emails", {
 	state: () => ({
 		emails: [] as Email[],
 		currentEmail: null as Email | null,
+		isRefreshing: false,
 	}),
 	actions: {
 		async fetchEmails(mailboxId: string, params: any) {
-			const response = await api.listEmails(mailboxId, params);
-			this.emails = response.data;
+			this.isRefreshing = true;
+			try {
+				const response = await api.listEmails(mailboxId, params);
+				this.emails = response.data;
+			} finally {
+				this.isRefreshing = false;
+			}
 		},
 		async fetchEmail(mailboxId: string, id: string) {
 			const response = await api.getEmail(mailboxId, id);
