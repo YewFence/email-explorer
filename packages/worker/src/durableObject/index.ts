@@ -284,6 +284,51 @@ export class MailboxDO extends DurableObject<Env> {
 		);
 	}
 
+	// Auth operation: get user by email
+	async getUserByEmail(email: string): Promise<User | null> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const result = this.#qb
+			.select("users")
+			.fields(["id", "email", "is_admin", "created_at", "updated_at"])
+			.where("email = ?", email)
+			.execute();
+
+		if (!result.results || result.results.length === 0) {
+			return null;
+		}
+
+		const user = result.results[0];
+		return {
+			id: String(user.id),
+			email: String(user.email),
+			isAdmin: user.is_admin === 1,
+			createdAt: Number(user.created_at),
+			updatedAt: Number(user.updated_at),
+		};
+	}
+
+	// Auth operation: update user password
+	async updateUserPassword(userId: string, newPassword: string): Promise<void> {
+		if (!this.#isAuthDO) throw new Error("Not an auth DO");
+
+		const hashedPassword = await this.#hashPassword(newPassword);
+
+		this.#qb
+			.update({
+				tableName: "users",
+				data: {
+					password_hash: hashedPassword,
+					updated_at: Date.now(),
+				},
+				where: {
+					conditions: "id = ?",
+					params: [userId],
+				},
+			})
+			.execute();
+	}
+
 	// Auth operation: grant mailbox access
 	async grantMailboxAccess(
 		userId: string,

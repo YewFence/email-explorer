@@ -4,7 +4,5 @@ export { MailboxDO } from "../src";
 export default EmailExplorer({
 	auth: {
         enabled: true,
-        registerEnabled: true
-    }
-
+    },
 });

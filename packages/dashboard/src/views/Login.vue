@@ -6,13 +6,15 @@
 					Sign in to Email Explorer
 				</h2>
 				<p class="mt-2 text-center text-sm text-gray-600">
-					Or
-					<router-link
-						to="/register"
-						class="font-medium text-indigo-600 hover:text-indigo-500"
-					>
-						create a new account
-					</router-link>
+					<span v-if="isRegistrationEnabled()">
+						Or
+						<router-link
+							to="/register"
+							class="font-medium text-indigo-600 hover:text-indigo-500"
+						>
+							create a new account
+						</router-link>
+					</span>
 				</p>
 			</div>
 			<form class="mt-8 space-y-6" @submit.prevent="handleLogin">
@@ -53,7 +55,15 @@
 						{{ authStore.loading ? "Signing in..." : "Sign in" }}
 					</button>
 				</div>
-			</form>
+			<div v-if="isAccountRecoveryEnabled()" class="text-center">
+				<router-link
+					to="/forgot-password"
+					class="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+				>
+					Forgot your password?
+				</router-link>
+			</div>
+		</form>
 		</div>
 	</div>
 </template>
@@ -62,9 +72,11 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useAppSettings } from "@/composables/useAppSettings";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { isRegistrationEnabled, isAccountRecoveryEnabled } = useAppSettings();
 
 const email = ref("");
 const password = ref("");

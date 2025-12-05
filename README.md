@@ -51,12 +51,25 @@ Email Explorer is a full-stack, serverless email client that runs entirely on yo
 - 📖 **[User Guides](docs/features/index.md)** - Complete documentation for all features
 - 🚀 **[Getting Started](#getting-started)** - Deploy in minutes
 - 🔐 **[Authentication](docs/features/authentication.md)** - Setup your first account
+- 🔑 **[Account Recovery](docs/features/account-recovery.md)** - Password reset via email
 - 👥 **[Admin Panel](docs/features/admin-panel.md)** - Manage users and permissions
 - ⚙️ **[Configuration](#configuration)** - Customize your deployment
 
 ## Overview
 
 Email Explorer gives you a private, self-hosted email solution with a user-friendly web interface. By leveraging the Cloudflare ecosystem, it offers a cost-effective and scalable alternative to traditional email hosting. All your data is stored securely in your own R2 buckets and Durable Objects, giving you full control over your information.
+
+### Screenshots
+
+<div align="center">
+  <img src="docs/home.png" alt="Email Explorer Home" width="600" />
+  <p><em>Mailbox management and email list view</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/new-email.png" alt="Email Composer" width="600" />
+  <p><em>Rich text email composer with formatting options</em></p>
+</div>
 
 ## Why Email Explorer?
 
@@ -155,6 +168,9 @@ export default EmailExplorer({
   auth: {
     enabled: true
     // registerEnabled not specified = smart mode
+  },
+  accountRecovery: {
+    fromEmail: 'noreply@yourdomain.com'  // Optional: enable password reset via email
   }
 })
 ```
@@ -181,7 +197,31 @@ export default EmailExplorer({
     enabled: false
   }
 })
+
+// With Account Recovery
+export default EmailExplorer({
+  auth: {
+    enabled: true
+  },
+  accountRecovery: {
+    fromEmail: 'noreply@yourdomain.com'  // Email address to send password reset links from
+  }
+})
 ```
+
+**Configuration Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `auth.enabled` | boolean | `true` | Enable/disable authentication |
+| `auth.registerEnabled` | boolean | `undefined` (smart mode) | Control user registration |
+| `accountRecovery.fromEmail` | string | `undefined` (disabled) | Enable password recovery via email |
+
+**Account Recovery:**
+- When configured, users can reset forgotten passwords via email
+- The `fromEmail` address must be a valid email on your Cloudflare account
+- Requires [Cloudflare Email Sending](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/) to be enabled
+- See [Account Recovery Guide](docs/features/account-recovery.md) for more details
 
 ### First-Time Setup
 
@@ -205,6 +245,7 @@ Comprehensive user guides are available for all features:
 
 - **[Feature Documentation](docs/features/index.md)** - Complete user guides
   - [Authentication Guide](docs/features/authentication.md) - Account creation, login, and security
+  - [Account Recovery Guide](docs/features/account-recovery.md) - Password reset via email
   - [Admin Panel Guide](docs/features/admin-panel.md) - User management and permissions
   - [Rich Text Editor Guide](docs/features/rich-text-editor.md) - Email formatting and composition
   - [Reply & Forward Guide](docs/features/reply-forward.md) - Email responses and threading
@@ -291,7 +332,6 @@ Planned features for future releases:
 
 - [ ] Email templates for quick responses
 - [ ] Two-factor authentication (2FA)
-- [ ] Password reset via email
 - [ ] Email drafts auto-save
 - [ ] Conversation threading view
 - [ ] Emoji picker in composer
@@ -306,10 +346,12 @@ See [ROADMAP.md](ROADMAP.md) for detailed planning and progress.
 ## Known Limitations
 
 **Current Limitations:**
-- Password reset must be done by administrator (email reset coming soon)
 - No email draft auto-save (manual save only)
 - Image uploads not yet supported (URLs work)
 - Single mailbox per user account (multiple access supported)
+
+**Optional Features:**
+- Password reset via email requires `accountRecovery.fromEmail` configuration
 
 **Browser Compatibility:**
 - Modern browsers required (Chrome 90+, Firefox 88+, Safari 14+)

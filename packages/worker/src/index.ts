@@ -51,6 +51,25 @@ const ErrorResponseSchema = z.object({
 	error: z.string(),
 });
 
+const ForgotPasswordRequestSchema = z.object({
+	email: z.string().email(),
+});
+
+const ResetPasswordRequestSchema = z.object({
+	token: z.string(),
+	newPassword: z.string().min(8),
+});
+
+const AppSettingsResponseSchema = z.object({
+	auth: z.object({
+		enabled: z.boolean(),
+		registerEnabled: z.boolean(),
+	}),
+	accountRecovery: z.object({
+		enabled: z.boolean(),
+	}),
+});
+
 const EmailMetadataSchema = z.object({
 	id: z.string(),
 	subject: z.string(),
@@ -1229,6 +1248,247 @@ class CreateDummyMailbox extends OpenAPIRoute {
 	}
 }
 
+class PostForgotPassword extends OpenAPIRoute {
+	schema = {
+		summary: "Request password reset email",
+		operationId: "forgotPassword",
+		tags: ["Auth"],
+		request: {
+			body: contentJson(ForgotPasswordRequestSchema),
+		},
+		responses: {
+			"200": {
+				description: "Password reset email sent",
+				...contentJson(SuccessResponseSchema),
+			},
+			"400": { description: "Bad request", ...contentJson(ErrorResponseSchema) },
+			"404": { description: "User not found", ...contentJson(ErrorResponseSchema) },
+			"503": { description: "Account recovery disabled", ...contentJson(ErrorResponseSchema) },
+		},
+	};
+
+	async handle(c: AppContext) {
+		if (!c.env.config?.accountRecovery) {
+			return c.json({ error: "Account recovery is not enabled" }, 503);
+		}
+
+		const data = await this.getValidatedData<typeof this.schema>();
+		const { email } = data.body;
+
+		const ns = c.env.MAILBOX;
+		const authId = ns.idFromName("AUTH");
+		const authStub = ns.get(authId);
+
+		const user = await authStub.getUserByEmail(email);
+		if (!user) {
+			return c.json({ error: "User not found" }, 404);
+		}
+
+		// Generate reset token (valid for 1 hour)
+		const token = crypto.randomUUID();
+		const expiresAt = Date.now() + 3600000; // 1 hour
+
+		// Store token in R2
+		const tokenKey = `recovery-tokens/${token}.json`;
+		await c.env.BUCKET.put(
+			tokenKey,
+			JSON.stringify({
+				userId: user.id,
+				email: user.email,
+				expiresAt,
+			}),
+			{
+				customMetadata: {
+					expiresAt: expiresAt.toString(),
+				},
+			},
+		);
+
+		// Send recovery email
+		const resetLink = `${new URL(c.req.url).origin}/reset-password?token=${token}`;
+		const mimeMessage = buildMimeMessage({
+			from: c.env.config.accountRecovery.fromEmail,
+			to: email,
+			subject: "Password Reset Request",
+			html: `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<style>
+		body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+		.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+		.header { background-color: #4F46E5; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+		.content { background-color: #f9f9f9; padding: 20px; border-radius: 5px; }
+		.button { display: inline-block; padding: 12px 30px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+		.footer { margin-top: 20px; font-size: 12px; color: #666; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h2 style="margin: 0;">Password Reset Request</h2>
+		</div>
+		<div class="content">
+			<p>We received a request to reset your password. Click the button below to proceed:</p>
+			<a href=\\"${resetLink}\\" class=\\"button\\">Reset Password</a>
+			<p>Or copy and paste this link in your browser:</p>
+			<p><a href=\\"${resetLink}\\" style=\\"color: #4F46E5; word-break: break-all;\\">${resetLink}</a></p>
+			<p style=\\"color: #666; font-size: 14px;\\">This link will expire in 1 hour.</p>
+			<p style=\\"color: #666; font-size: 14px;\\">If you didn't request this, you can safely ignore this email.</p>
+		</div>
+		<div class="footer">
+			<p>Email Explorer - Password Reset</p>
+		</div>
+	</div>
+</body>
+</html>`,
+			text: `Password Reset Request
+
+We received a request to reset your password. Click the link below to proceed:
+
+${resetLink}
+
+This link will expire in 1 hour.
+
+If you didn't request this, you can safely ignore this email.`,
+		});
+
+		const emailMessage = new EmailMessage(
+			c.env.config.accountRecovery.fromEmail,
+			email,
+			mimeMessage,
+		);
+
+		try {
+			await c.env.SEND_EMAIL.send(emailMessage);
+		} catch (e) {
+			console.error("Failed to send recovery email:", e);
+			return c.json({ error: "Failed to send recovery email" }, 500);
+		}
+
+		return c.json({ status: "Password reset email sent" });
+	}
+}
+
+class PostResetPassword extends OpenAPIRoute {
+	schema = {
+		summary: "Reset password with token",
+		operationId: "resetPassword",
+		tags: ["Auth"],
+		request: {
+			body: contentJson(ResetPasswordRequestSchema),
+		},
+		responses: {
+			"200": {
+				description: "Password reset successfully",
+				...contentJson(SuccessResponseSchema),
+			},
+			"400": { description: "Bad request", ...contentJson(ErrorResponseSchema) },
+			"401": { description: "Invalid or expired token", ...contentJson(ErrorResponseSchema) },
+			"503": { description: "Account recovery disabled", ...contentJson(ErrorResponseSchema) },
+		},
+	};
+
+	async handle(c: AppContext) {
+		if (!c.env.config?.accountRecovery) {
+			return c.json({ error: "Account recovery is not enabled" }, 503);
+		}
+
+		const data = await this.getValidatedData<typeof this.schema>();
+		const { token, newPassword } = data.body;
+
+		// Verify token
+		const tokenKey = `recovery-tokens/${token}.json`;
+		const tokenObj = await c.env.BUCKET.get(tokenKey);
+
+		if (!tokenObj) {
+			return c.json({ error: "Invalid or expired token" }, 401);
+		}
+
+		const tokenData = await tokenObj.json<{
+			userId: string;
+			email: string;
+			expiresAt: number;
+		}>();
+
+		if (tokenData.expiresAt < Date.now()) {
+			await c.env.BUCKET.delete(tokenKey);
+			return c.json({ error: "Token has expired" }, 401);
+		}
+
+		// Update password
+		const ns = c.env.MAILBOX;
+		const authId = ns.idFromName("AUTH");
+		const authStub = ns.get(authId);
+
+		try {
+			await authStub.updateUserPassword(tokenData.userId, newPassword);
+		} catch (e) {
+			return c.json({ error: "Failed to update password" }, 500);
+		}
+
+		// Delete used token
+		await c.env.BUCKET.delete(tokenKey);
+
+		return c.json({ status: "Password reset successfully" });
+	}
+}
+
+class GetAppSettings extends OpenAPIRoute {
+	schema = {
+		summary: "Get application settings",
+		operationId: "getAppSettings",
+		tags: ["Settings"],
+		responses: {
+			"200": {
+				description: "Application settings",
+				...contentJson(AppSettingsResponseSchema),
+			},
+		},
+	};
+
+	async handle(c: AppContext) {
+		const config = c.env.config || {};
+		const authEnabled = config.auth?.enabled !== false;
+
+		// Check if there are any users in the system
+		let userCount = 0;
+		if (authEnabled) {
+			const ns = c.env.MAILBOX;
+			const authId = ns.idFromName("AUTH");
+			const authStub = ns.get(authId);
+			try {
+				const users = await authStub.getUsers();
+				userCount = users.length;
+			} catch (e) {
+				// If we can't get users, assume there are users (safer default)
+				userCount = 1;
+			}
+		}
+
+		// Registration is enabled if:
+		// 1. Explicitly enabled in config, OR
+		// 2. Not explicitly disabled AND there are 0 users (fresh app)
+		const registerEnabled =
+			config.auth?.registerEnabled === true ||
+			(config.auth?.registerEnabled !== false && userCount === 0);
+
+		// Account recovery is enabled if the config has accountRecovery with fromEmail
+		const accountRecoveryEnabled = (config.accountRecovery && config.accountRecovery.fromEmail) !== undefined;
+
+		return c.json({
+			auth: {
+				enabled: authEnabled,
+				registerEnabled,
+			},
+			accountRecovery: {
+				enabled: accountRecoveryEnabled,
+			},
+		});
+	}
+}
+
 // Helper function to extract session token
 function getSessionToken(request: Request): string | null {
 	// Try Authorization header first
@@ -1271,6 +1531,9 @@ function isPublicRoute(pathname: string): boolean {
 	const publicRoutes = [
 		"/api/v1/auth/register",
 		"/api/v1/auth/login",
+		"/api/v1/auth/forgot-password",
+		"/api/v1/auth/reset-password",
+		"/api/v1/settings",
 		"/api/docs",
 		"/api/openapi.json",
 	];
@@ -1296,11 +1559,16 @@ openapi.post("/api/v1/auth/register", PostRegister);
 openapi.post("/api/v1/auth/login", PostLogin);
 openapi.post("/api/v1/auth/logout", PostLogout);
 openapi.get("/api/v1/auth/me", GetMe);
+openapi.post("/api/v1/auth/forgot-password", PostForgotPassword);
+openapi.post("/api/v1/auth/reset-password", PostResetPassword);
 openapi.post("/api/v1/auth/admin/register", PostAdminRegister);
 openapi.get("/api/v1/auth/admin/users", GetUsers);
 openapi.put("/api/v1/auth/admin/users/:userId", PutUser);
 openapi.post("/api/v1/auth/admin/grant-access", PostGrantAccess);
 openapi.post("/api/v1/auth/admin/revoke-access", PostRevokeAccess);
+
+// Settings endpoints
+openapi.get("/api/v1/settings", GetAppSettings);
 
 // Existing endpoints
 openapi.post("/api/v1/debug/create-mailbox", CreateDummyMailbox);
@@ -1424,6 +1692,7 @@ const defaultOptions: EmailExplorerOptions = {
 export function EmailExplorer(_options: EmailExplorerOptions = {}) {
 	// Merge user options with defaults
 	const options: EmailExplorerOptions = {
+        ..._options,
 		auth: {
 			...defaultOptions.auth,
 			..._options.auth,

@@ -40,6 +40,9 @@ apiClient.interceptors.response.use(
 );
 
 export default {
+	// Settings
+	getAppSettings: () => apiClient.get("/api/v1/settings"),
+
 	// Auth
 	register: (email: string, password: string) =>
 		apiClient.post("/api/v1/auth/register", { email, password }),
@@ -47,6 +50,10 @@ export default {
 		apiClient.post("/api/v1/auth/login", { email, password }),
 	logout: () => apiClient.post("/api/v1/auth/logout"),
 	getCurrentUser: () => apiClient.get("/api/v1/auth/me"),
+	forgotPassword: (email: string) =>
+		apiClient.post("/api/v1/auth/forgot-password", { email }),
+	resetPassword: (token: string, newPassword: string) =>
+		apiClient.post("/api/v1/auth/reset-password", { token, newPassword }),
 
 	// Set/clear auth token manually
 	setAuthToken: (token: string) => {

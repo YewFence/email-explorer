@@ -4,11 +4,13 @@ import Admin from "@/views/Admin.vue";
 import Contacts from "@/views/Contacts.vue";
 import EmailDetail from "@/views/EmailDetail.vue";
 import EmailList from "@/views/EmailList.vue";
+import ForgotPassword from "@/views/ForgotPassword.vue";
 import Home from "@/views/Home.vue";
 import Login from "@/views/Login.vue";
 import Mailbox from "@/views/Mailbox.vue";
 import NotFound from "@/views/NotFound.vue";
 import Register from "@/views/Register.vue";
+import ResetPassword from "@/views/ResetPassword.vue";
 import SearchResults from "@/views/SearchResults.vue";
 import Settings from "@/views/Settings.vue";
 
@@ -26,6 +28,18 @@ const router = createRouter({
 			name: "Register",
 			component: Register,
 			meta: { title: "Register", public: true },
+		},
+		{
+			path: "/forgot-password",
+			name: "ForgotPassword",
+			component: ForgotPassword,
+			meta: { title: "Forgot Password", public: true },
+		},
+		{
+			path: "/reset-password",
+			name: "ResetPassword",
+			component: ResetPassword,
+			meta: { title: "Reset Password", public: true },
 		},
 		{
 			path: "/",
@@ -117,9 +131,9 @@ router.beforeEach(async (to, _from, next) => {
 	} else if (
 		isPublicRoute &&
 		authStore.isAuthenticated &&
-		(to.name === "Login" || to.name === "Register")
+		(to.name === "Login" || to.name === "Register" || to.name === "ForgotPassword")
 	) {
-		// Redirect to home if already authenticated and trying to access login/register
+		// Redirect to home if already authenticated and trying to access login/register/forgot-password
 		next({ name: "Home" });
 	} else {
 		next();

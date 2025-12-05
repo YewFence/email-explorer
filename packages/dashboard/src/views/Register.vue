@@ -1,5 +1,14 @@
 <template>
-	<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+	<div v-if="!isRegistrationEnabled()" class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+		<div class="max-w-md w-full text-center">
+			<h2 class="text-2xl font-bold text-gray-900 mb-4">Registration Disabled</h2>
+			<p class="text-gray-600 mb-6">Registration is currently disabled. Please contact an administrator.</p>
+			<router-link to="/login" class="text-indigo-600 hover:text-indigo-500 font-medium">
+				Return to login
+			</router-link>
+		</div>
+	</div>
+	<div v-else class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
 		<div class="max-w-md w-full space-y-8">
 			<div>
 				<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
@@ -80,9 +89,11 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useAppSettings } from "@/composables/useAppSettings";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { isRegistrationEnabled } = useAppSettings();
 
 const email = ref("");
 const password = ref("");

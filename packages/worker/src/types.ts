@@ -3,6 +3,9 @@ export interface EmailExplorerOptions {
 		enabled?: boolean;
 		registerEnabled?: boolean;
 	};
+	accountRecovery?: {
+		fromEmail: string;
+	};
 }
 
 export interface Session {
