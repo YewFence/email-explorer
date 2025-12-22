@@ -4,6 +4,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
+import { buildEmlMessage } from "./eml-builder";
 import { buildMimeMessage } from "./mime-builder";
 import {
 	GetMe,
@@ -1202,6 +1203,127 @@ class GetAttachment extends OpenAPIRoute {
 	}
 }
 
+class GetEmailExport extends OpenAPIRoute {
+	schema = {
+		summary: "Export an email as EML file",
+		operationId: "exportEmail",
+		tags: ["Emails"],
+		request: {
+			params: z.object({
+				mailboxId: z.string(),
+				id: z.string(),
+			}),
+		},
+		responses: {
+			"200": {
+				description: "EML file",
+				content: {
+					"message/rfc822": {
+						schema: z.string().openapi({ format: "binary" }),
+					},
+				},
+			},
+			"404": { description: "Not found", ...contentJson(ErrorResponseSchema) },
+		},
+	};
+
+	async handle(c: AppContext) {
+		const data = await this.getValidatedData<typeof this.schema>();
+		const { mailboxId, id } = data.params;
+
+		const key = `mailboxes/${mailboxId}.json`;
+		const obj = await c.env.BUCKET.head(key);
+		if (!obj) {
+			return c.json({ error: "Mailbox not found" }, 404);
+		}
+
+		const ns = c.env.MAILBOX;
+		const doId = ns.idFromName(mailboxId);
+		const stub = ns.get(doId);
+
+		const emailResult = await stub.getEmail(id);
+
+		if (!emailResult) {
+			return c.json({ error: "Email not found" }, 404);
+		}
+
+		// Type assertion for email data
+		const email = emailResult as unknown as {
+			id: string;
+			subject: string;
+			sender: string;
+			recipient: string;
+			date: string;
+			body: string;
+			read: boolean;
+			starred: boolean;
+			in_reply_to: string | null;
+			email_references: string | null;
+			attachments: Array<{
+				id: string;
+				filename: string;
+				mimetype: string;
+				disposition: string | null;
+				content_id: string | null;
+			}>;
+		};
+
+		// Fetch attachment contents from R2
+		const attachmentsWithContent = [];
+		if (email.attachments && email.attachments.length > 0) {
+			for (const att of email.attachments) {
+				const attachmentKey = `attachments/${id}/${att.id}/${att.filename}`;
+				const attachmentObj = await c.env.BUCKET.get(attachmentKey);
+
+				if (attachmentObj) {
+					const arrayBuffer = await attachmentObj.arrayBuffer();
+					const base64 = btoa(
+						new Uint8Array(arrayBuffer).reduce(
+							(data, byte) => data + String.fromCharCode(byte),
+							"",
+						),
+					);
+					attachmentsWithContent.push({
+						filename: att.filename,
+						content: base64,
+						mimetype: att.mimetype,
+						disposition: att.disposition,
+						contentId: att.content_id,
+					});
+				}
+			}
+		}
+
+		// Build EML content
+		const emlContent = buildEmlMessage({
+			messageId: email.id,
+			from: email.sender,
+			to: email.recipient,
+			subject: email.subject || "(No Subject)",
+			date: email.date,
+			html: email.body || undefined,
+			inReplyTo: email.in_reply_to,
+			references: email.email_references,
+			attachments: attachmentsWithContent,
+		});
+
+		// Generate filename
+		const safeSubject = (email.subject || "email")
+			.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_")
+			.substring(0, 50);
+		const filename = `${safeSubject}_${id.substring(0, 8)}.eml`;
+
+		const headers = new Headers();
+		headers.set("Content-Type", "message/rfc822");
+		headers.set(
+			"Content-Disposition",
+			`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+		);
+
+		return new Response(emlContent, { headers });
+	}
+}
+
 class CreateDummyMailbox extends OpenAPIRoute {
 	schema = {
 		summary: "Create a dummy mailbox for debugging",
@@ -1600,6 +1722,10 @@ openapi.get("/api/v1/mailboxes/:mailboxId/search", GetSearch);
 openapi.get(
 	"/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId",
 	GetAttachment,
+);
+openapi.get(
+	"/api/v1/mailboxes/:mailboxId/emails/:id/export",
+	GetEmailExport,
 );
 
 async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
