@@ -63,6 +63,12 @@
               </button>
             </div>
           </div>
+          <button @click="handleExport" class="p-2.5 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400 rounded-xl hover:bg-green-50 dark:hover:bg-gray-700/50 transition-all duration-200 group relative cursor-pointer" title="Download as EML">
+            <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">Download as EML</div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
           <button @click="handleDelete" class="p-2.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-gray-700/50 transition-all duration-200 group relative cursor-pointer" title="Delete">
             <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20">Delete</div>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -184,6 +190,12 @@ const getAttachmentUrl = (attachmentId: string) => {
 	const mailboxId = route.params.mailboxId as string;
 	const emailId = route.params.id as string;
 	return `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`;
+};
+
+const handleExport = () => {
+	const mailboxId = route.params.mailboxId as string;
+	const emailId = route.params.id as string;
+	window.open(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`, "_blank");
 };
 
 const formatBytes = (bytes: number, decimals = 2) => {
