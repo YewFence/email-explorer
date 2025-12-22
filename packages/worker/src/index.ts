@@ -1888,7 +1888,7 @@ export function EmailExplorer(_options: EmailExplorerOptions = {}) {
 
 	return {
 		async email(
-			event: { raw: ReadableStream; rawSize: number },
+			event: { raw: ReadableStream; rawSize: number; message: ForwardableEmailMessage },
 			env: Env,
 			context: ExecutionContext,
 		) {
