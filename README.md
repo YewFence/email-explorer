@@ -29,22 +29,28 @@ Email Explorer is a full-stack, serverless email client that runs entirely on yo
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Why Email Explorer?](#why-email-explorer)
-- [Key Features](#key-features)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Documentation](#documentation)
-- [Architecture](#architecture)
-- [Production Ready Features](#production-ready-features)
-- [Testing](#testing)
-- [Roadmap & Future Enhancements](#roadmap--future-enhancements)
-- [Known Limitations](#known-limitations)
-- [Security](#security)
-- [Contributing](#contributing)
-- [Support](#support)
-- [License](#license)
+- [Email Explorer](#email-explorer)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Links](#quick-links)
+  - [Overview](#overview)
+    - [Screenshots](#screenshots)
+  - [Why Email Explorer?](#why-email-explorer)
+  - [Key Features](#key-features)
+  - [Prerequisites](#prerequisites)
+  - [Getting Started](#getting-started)
+    - [Configuration](#configuration)
+    - [First-Time Setup](#first-time-setup)
+    - [Admin Operations](#admin-operations)
+  - [Documentation](#documentation)
+  - [Architecture](#architecture)
+  - [Production Ready Features](#production-ready-features)
+  - [Testing](#testing)
+  - [Roadmap \& Future Enhancements](#roadmap--future-enhancements)
+  - [Known Limitations](#known-limitations)
+  - [Security](#security)
+  - [Contributing](#contributing)
+  - [Support](#support)
+  - [License](#license)
 
 ## Quick Links
 
@@ -115,6 +121,7 @@ Email Explorer gives you a private, self-hosted email solution with a user-frien
 - **🔍 Search**: Find emails quickly with full-text search across all your mailboxes.
 - **📧 Contacts**: Manage your contacts with an integrated address book.
 - **⚡ Serverless Architecture**: Each mailbox is its own Durable Object for optimal performance and isolation.
+- **🗜️ Bulk Export**: Download single email or all emails in a folder as a ZIP archive for easy backup and transfer.
 
 ## Prerequisites
 
