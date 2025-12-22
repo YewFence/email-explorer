@@ -1277,12 +1277,12 @@ class GetEmailExport extends OpenAPIRoute {
 
 				if (attachmentObj) {
 					const arrayBuffer = await attachmentObj.arrayBuffer();
-					const base64 = btoa(
-						new Uint8Array(arrayBuffer).reduce(
-							(data, byte) => data + String.fromCharCode(byte),
-							"",
-						),
-					);
+					const bytes = new Uint8Array(arrayBuffer);
+					let binary = '';
+					for (let i = 0; i < bytes.length; i++) {
+						binary += String.fromCharCode(bytes[i]);
+					}
+					const base64 = btoa(binary);
 					attachmentsWithContent.push({
 						filename: att.filename,
 						content: base64,

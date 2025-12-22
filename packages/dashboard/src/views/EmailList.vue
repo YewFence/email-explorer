@@ -193,16 +193,23 @@ const handleExportAll = async () => {
 	const zip = new JSZip();
 
 	try {
-		for (const email of emails.value) {
-			const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
-			const response = await fetch(url);
-			if (response.ok) {
-				const blob = await response.blob();
-				const safeSubject = email.subject.replace(/[\\/:*?"<>|]/g, "_").substring(0, 100);
-				zip.file(`${safeSubject}.eml`, blob);
+		const emailPromises = emails.value.map(async (email) => {
+			try {
+				const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
+				const response = await fetch(url);
+				if (response.ok) {
+					const blob = await response.blob();
+					const safeSubject = email.subject.replace(/[\\/:*?"<>|]/g, "_").substring(0, 100);
+					zip.file(`${safeSubject}.eml`, blob);
+				} else {
+					console.error(`Failed to export email ${email.id}: ${response.statusText}`);
+				}
+			} catch (err) {
+				console.error(`Error exporting email ${email.id}:`, err);
 			}
-		}
+		});
 
+		await Promise.all(emailPromises);
 		const content = await zip.generateAsync({ type: "blob" });
 		const downloadUrl = URL.createObjectURL(content);
 		const link = document.createElement("a");

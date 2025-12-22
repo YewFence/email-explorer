@@ -205,8 +205,11 @@ const downloadFile = (url: string, fileName: string) => {
 const handleExport = () => {
 	const mailboxId = route.params.mailboxId as string;
 	const emailId = route.params.id as string;
+	const safeSubject = (email.value?.subject || emailId)
+		.replace(/[/\\:*?"<>|]/g, '_')
+		.substring(0, 50);
 	const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
-	downloadFile(url, `${email.value?.subject || emailId}.eml`);
+	downloadFile(url, `${safeSubject || emailId}.eml`);
 };
 
 const formatBytes = (bytes: number, decimals = 2) => {

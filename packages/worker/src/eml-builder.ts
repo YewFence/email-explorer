@@ -27,11 +27,12 @@ function encodeHeader(text: string): string {
 		return text;
 	}
 	// Use Base64 encoding for UTF-8
-	const encoded = btoa(
-		new TextEncoder()
-			.encode(text)
-			.reduce((acc, byte) => acc + String.fromCharCode(byte), ""),
-	);
+	const bytes = new TextEncoder().encode(text);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i]);
+	}
+	const encoded = btoa(binary);
 	return `=?UTF-8?B?${encoded}?=`;
 }
 
