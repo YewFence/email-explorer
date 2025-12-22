@@ -167,10 +167,21 @@ const toggleStarStatus = (email: Email) => {
 	});
 };
 
+const downloadFile = (url: string, fileName: string) => {
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', fileName); // Download and name
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const handleExport = (emailId: string) => {
 	const mailboxId = route.params.mailboxId as string;
+	const emailSubject = emails.value.find(email => email.id === emailId)?.subject || emailId;
 	const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
-	window.open(url, "_blank");
+	downloadFile(url, `${emailSubject}.eml`);
 };
 
 const handleExportAll = async () => {
@@ -181,7 +192,7 @@ const handleExportAll = async () => {
 
 	for (const email of emails.value) {
 		const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
-		window.open(url, "_blank");
+		downloadFile(url, `${email.subject}.eml`);
 		// Small delay to prevent browser from blocking multiple popups
 		await new Promise((resolve) => setTimeout(resolve, 300));
 	}

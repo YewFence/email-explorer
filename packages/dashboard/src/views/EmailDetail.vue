@@ -192,10 +192,21 @@ const getAttachmentUrl = (attachmentId: string) => {
 	return `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`;
 };
 
+const downloadFile = (url: string, fileName: string) => {
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', fileName); // Download and name
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const handleExport = () => {
 	const mailboxId = route.params.mailboxId as string;
 	const emailId = route.params.id as string;
-	window.open(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`, "_blank");
+	const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
+	downloadFile(url, `${email.value?.subject || emailId}.eml`);
 };
 
 const formatBytes = (bytes: number, decimals = 2) => {
