@@ -179,10 +179,22 @@ const downloadFile = (url: string, fileName: string) => {
 };
 
 const handleExport = (emailId: string) => {
-	const mailboxId = route.params.mailboxId as string;
-	const emailSubject = emails.value.find(email => email.id === emailId)?.subject || emailId;
-	const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
-	downloadFile(url, `${emailSubject}.eml`);
+	try {
+		const mailboxId = route.params.mailboxId as string;
+		const emailSubject = emails.value.find(email => email.id === emailId)?.subject || '';
+		// Sanitize the subject by removing invalid file name characters
+		const sanitizedSubject = emailSubject
+			.replace(/[/\\:*?"<>|]/g, '_')
+			.substring(0, 50)
+			.trim();
+		// Fallback to emailId if subject is empty after sanitization
+		const fileName = sanitizedSubject || emailId;
+		const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
+		downloadFile(url, `${fileName}.eml`);
+	} catch (error) {
+		console.error(`Failed to export email ${emailId}:`, error);
+		alert('Failed to export email. Please try again.');
+	}
 };
 
 const handleExportAll = async () => {
