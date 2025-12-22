@@ -7,7 +7,7 @@
           @click="handleExportAll"
           :disabled="emails.length === 0 || isExportingAll"
           class="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-gray-700/50 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
-          :title="isExportingAll ? 'Downloading...' : 'Download all emails as EML'"
+          :title="isExportingAll ? 'Downloading...' : 'Download all emails as ZIP'"
         >
           <svg v-if="!isExportingAll" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -93,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import JSZip from "jszip";
 import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted, watch, ref } from "vue";
 import { useRoute } from "vue-router";
@@ -189,15 +190,31 @@ const handleExportAll = async () => {
 
 	isExportingAll.value = true;
 	const mailboxId = route.params.mailboxId as string;
+	const zip = new JSZip();
 
-	for (const email of emails.value) {
-		const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
-		downloadFile(url, `${email.subject}.eml`);
-		// Small delay to prevent browser from blocking multiple popups
-		await new Promise((resolve) => setTimeout(resolve, 300));
+	try {
+		for (const email of emails.value) {
+			const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
+			const response = await fetch(url);
+			if (response.ok) {
+				const blob = await response.blob();
+				const safeSubject = email.subject.replace(/[\\/:*?"<>|]/g, "_").substring(0, 100);
+				zip.file(`${safeSubject}.eml`, blob);
+			}
+		}
+
+		const content = await zip.generateAsync({ type: "blob" });
+		const downloadUrl = URL.createObjectURL(content);
+		const link = document.createElement("a");
+		link.href = downloadUrl;
+		link.download = `${folderName.value}-emails.zip`;
+		link.click();
+		URL.revokeObjectURL(downloadUrl);
+	} catch (error) {
+		console.error("Failed to export emails:", error);
+	} finally {
+		isExportingAll.value = false;
 	}
-
-	isExportingAll.value = false;
 };
 
 const handleDelete = (emailId: string) => {
