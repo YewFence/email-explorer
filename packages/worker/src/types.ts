@@ -29,4 +29,9 @@ export type Env = {
 	BUCKET: R2Bucket;
 	SEND_EMAIL: SendEmail;
 	config?: EmailExplorerOptions;
+	// 邮件转发配置（可选）
+	FORWARD_EMAILS?: string; // 用逗号分隔的邮箱列表
+	// Telegram 通知配置（可选）
+	TG_TOKEN?: string;
+	TG_CHAT_ID?: string;
 };

@@ -1744,7 +1744,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 }
 
 async function receiveEmail(
-	event: { raw: ReadableStream; rawSize: number },
+	event: { raw: ReadableStream; rawSize: number; message: ForwardableEmailMessage },
 	env: Env,
 	_ctx: ExecutionContext,
 ) {
@@ -1806,6 +1806,67 @@ async function receiveEmail(
 		},
 		attachmentData,
 	);
+
+	// ----------------------
+	// 邮件转发功能
+	// ----------------------
+	let fwdStatus = "";
+	if (env.FORWARD_EMAILS) {
+		const forwardEmails = env.FORWARD_EMAILS.split(",")
+			.map((email) => email.trim())
+			.filter((email) => email.length > 0);
+
+		if (forwardEmails.length > 0) {
+			const forwardPromises = forwardEmails.map((email) =>
+				event.message
+					.forward(email)
+					.then(() => `${email}: ✅`)
+					.catch((err) => `${email}: ❌(${err.message})`),
+			);
+
+			const results = await Promise.all(forwardPromises);
+			fwdStatus = results.join(" | ");
+			console.log(`[Forward Logic] ${fwdStatus}`);
+		}
+	}
+
+	// ----------------------
+	// Telegram 通知
+	// ----------------------
+	if (env.TG_TOKEN && env.TG_CHAT_ID) {
+		try {
+			const subject = parsedEmail.subject || "No Subject";
+			const from = parsedEmail.from?.address || "Unknown";
+			const to = parsedEmail.to[0].address;
+			
+			let summary = `📧 新邮件\nFrom: ${from}\nTo: ${to}\nSubject: ${subject}`;
+			
+			if (fwdStatus) {
+				summary += `\n\n转发状态:\n${fwdStatus}`;
+			}
+
+			const tgUrl = `https://api.telegram.org/bot${env.TG_TOKEN}/sendMessage`;
+
+			const response = await fetch(tgUrl, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					chat_id: env.TG_CHAT_ID,
+					text: summary,
+				}),
+			});
+
+			const result = await response.json() as { ok?: boolean; error_code?: number; description?: string };
+
+			if (result.ok) {
+				console.log("[Telegram Success] Notification sent.");
+			} else {
+				console.error(`[Telegram FAILED] API Error: ${JSON.stringify(result)}`);
+			}
+		} catch (tgError) {
+			console.error(`[Telegram Network Error] ${tgError}`);
+		}
+	}
 }
 
 const defaultOptions: EmailExplorerOptions = {
