@@ -211,8 +211,12 @@ const handleExportAll = async () => {
 				const response = await fetch(url);
 				if (response.ok) {
 					const blob = await response.blob();
-					const safeSubject = email.subject.replace(/[\\/:*?"<>|]/g, "_").substring(0, 100);
-					zip.file(`${safeSubject}.eml`, blob);
+					const sanitizedSubject = email.subject
+						.replace(/[/\\:*?"<>|]/g, '_')
+						.substring(0, 50)
+						.trim();
+					const fileName = sanitizedSubject || email.id;
+					zip.file(`${fileName}.eml`, blob);
 				} else {
 					console.error(`Failed to export email ${email.id}: ${response.statusText}`);
 				}
