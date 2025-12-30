@@ -182,9 +182,15 @@ function slugify(text: string) {
 		.replace(/-+$/, ""); // Trim - from end of text
 }
 
-function getMailboxDisplayName(settings: Record<string, unknown>, fallback: string) {
+function getMailboxDisplayName(settings: unknown, fallback: string) {
+	const normalizedSettings =
+		typeof settings === "object" && settings !== null
+			? (settings as Record<string, unknown>)
+			: {};
 	const fromName =
-		typeof settings.fromName === "string" ? settings.fromName.trim() : "";
+		typeof normalizedSettings.fromName === "string"
+			? normalizedSettings.fromName.trim()
+			: "";
 	return fromName ? fromName : fallback;
 }
 
