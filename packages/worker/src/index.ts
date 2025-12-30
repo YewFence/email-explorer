@@ -200,20 +200,28 @@ class GetMailboxes extends OpenAPIRoute {
 		const list = await c.env.BUCKET.list({
 			prefix: "mailboxes/",
 		});
-		const mailboxes = await Promise.all(list.objects.map(async (obj) => {
-			const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-			const mailboxObj = await c.env.BUCKET.get(obj.key);
-			const settings = mailboxObj ? await mailboxObj.json() : {};
-			const name =
-				typeof settings?.fromName === "string" && settings.fromName.trim()
-					? settings.fromName
-					: id;
-			return {
-				id,
-				name,
-				email: id,
-			};
-		}));
+		const mailboxes = [];
+		const batchSize = 50;
+		for (let i = 0; i < list.objects.length; i += batchSize) {
+			const batch = list.objects.slice(i, i + batchSize);
+			const batchResults = await Promise.all(
+				batch.map(async (obj) => {
+					const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+					const mailboxObj = await c.env.BUCKET.get(obj.key);
+					const settings = mailboxObj ? await mailboxObj.json() : {};
+					const name =
+						typeof settings?.fromName === "string" && settings.fromName.trim()
+							? settings.fromName
+							: id;
+					return {
+						id,
+						name,
+						email: id,
+					};
+				}),
+			);
+			mailboxes.push(...batchResults);
+		}
 		return c.json(mailboxes);
 	}
 }
