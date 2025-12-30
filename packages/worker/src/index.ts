@@ -203,27 +203,47 @@ class GetMailboxes extends OpenAPIRoute {
 	};
 
 	async handle(c: AppContext) {
-		const list = await c.env.BUCKET.list({
-			prefix: "mailboxes/",
-		});
+		const allObjects = [];
+		let listResult;
+		let cursor: string | undefined;
+
+		do {
+			listResult = await c.env.BUCKET.list({
+				prefix: "mailboxes/",
+				cursor,
+			});
+			allObjects.push(...listResult.objects);
+			cursor = listResult.cursor;
+		} while (listResult.truncated);
+
 		const mailboxes = [];
 		const batchSize = 50;
-		for (let i = 0; i < list.objects.length; i += batchSize) {
-			const batch = list.objects.slice(i, i + batchSize);
+		for (let i = 0; i < allObjects.length; i += batchSize) {
+			const batch = allObjects.slice(i, i + batchSize);
 			const batchResults = await Promise.all(
 				batch.map(async (obj) => {
-					const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-					const mailboxObj = await c.env.BUCKET.get(obj.key);
-					const settings = mailboxObj ? await mailboxObj.json() : {};
-					const name = getMailboxDisplayName(settings, id);
-					return {
-						id,
-						name,
-						email: id,
-					};
+					try {
+						const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+						const mailboxObj = await c.env.BUCKET.get(obj.key);
+						const settings = mailboxObj ? await mailboxObj.json() : {};
+						const name = getMailboxDisplayName(settings, id);
+						return {
+							id,
+							name,
+							email: id,
+						};
+					} catch (error) {
+						console.error(`Failed to process mailbox ${obj.key}:`, error);
+						return null;
+					}
 				}),
 			);
-			mailboxes.push(...batchResults);
+			mailboxes.push(
+				...batchResults.filter(
+					(mailbox): mailbox is { id: string; name: string; email: string } =>
+						mailbox !== null,
+				),
+			);
 		}
 		return c.json(mailboxes);
 	}
