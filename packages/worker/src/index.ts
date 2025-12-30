@@ -200,14 +200,20 @@ class GetMailboxes extends OpenAPIRoute {
 		const list = await c.env.BUCKET.list({
 			prefix: "mailboxes/",
 		});
-		const mailboxes = list.objects.map((obj) => {
+		const mailboxes = await Promise.all(list.objects.map(async (obj) => {
 			const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+			const mailboxObj = await c.env.BUCKET.get(obj.key);
+			const settings = mailboxObj ? await mailboxObj.json() : {};
+			const name =
+				typeof settings?.fromName === "string" && settings.fromName.trim()
+					? settings.fromName
+					: id;
 			return {
 				id,
-				name: id,
+				name,
 				email: id,
 			};
-		});
+		}));
 		return c.json(mailboxes);
 	}
 }
@@ -240,9 +246,13 @@ class GetMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 		const settings = await obj.json();
+		const name =
+			typeof settings?.fromName === "string" && settings.fromName.trim()
+				? settings.fromName
+				: mailboxId;
 		const response = {
 			id: mailboxId,
-			name: mailboxId,
+			name,
 			email: mailboxId,
 			settings: settings,
 		};
@@ -283,9 +293,13 @@ class PutMailbox extends OpenAPIRoute {
 
 		await c.env.BUCKET.put(key, JSON.stringify(settings));
 
+		const name =
+			typeof settings?.fromName === "string" && settings.fromName.trim()
+				? settings.fromName
+				: mailboxId;
 		const response = {
 			id: mailboxId,
-			name: mailboxId,
+			name,
 			email: mailboxId,
 			settings: settings,
 		};
