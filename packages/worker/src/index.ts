@@ -209,48 +209,47 @@ class GetMailboxes extends OpenAPIRoute {
 	};
 
 	async handle(c: AppContext) {
-		const allObjects = [];
-		let listResult;
+		const BATCH_SIZE = 50;
 		let cursor: string | undefined;
+		const mailboxes: { id: string; name: string; email: string }[] = [];
 
 		do {
-			listResult = await c.env.BUCKET.list({
+			const listResult = await c.env.BUCKET.list({
 				prefix: "mailboxes/",
 				cursor,
 			});
-			allObjects.push(...listResult.objects);
+
+			for (let i = 0; i < listResult.objects.length; i += BATCH_SIZE) {
+				const batch = listResult.objects.slice(i, i + BATCH_SIZE);
+				const batchResults = await Promise.all(
+					batch.map(async (obj) => {
+						try {
+							const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+							const mailboxObj = await c.env.BUCKET.get(obj.key);
+							const settings = mailboxObj ? await mailboxObj.json() : {};
+							const name = getMailboxDisplayName(settings, id);
+							return {
+								id,
+								name,
+								email: id,
+							};
+						} catch (error) {
+							console.error(`Failed to process mailbox ${obj.key}:`, error);
+							return null;
+						}
+					}),
+				);
+				mailboxes.push(
+					...batchResults.filter(
+						(mailbox): mailbox is { id: string; name: string; email: string } =>
+							mailbox !== null,
+					),
+				);
+			}
+
 			cursor = listResult.cursor;
 		} while (listResult.truncated);
 
-		const mailboxes = [];
-		const batchSize = 50;
-		for (let i = 0; i < allObjects.length; i += batchSize) {
-			const batch = allObjects.slice(i, i + batchSize);
-			const batchResults = await Promise.all(
-				batch.map(async (obj) => {
-					try {
-						const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-						const mailboxObj = await c.env.BUCKET.get(obj.key);
-						const settings = mailboxObj ? await mailboxObj.json() : {};
-						const name = getMailboxDisplayName(settings, id);
-						return {
-							id,
-							name,
-							email: id,
-						};
-					} catch (error) {
-						console.error(`Failed to process mailbox ${obj.key}:`, error);
-						return null;
-					}
-				}),
-			);
-			mailboxes.push(
-				...batchResults.filter(
-					(mailbox): mailbox is { id: string; name: string; email: string } =>
-						mailbox !== null,
-				),
-			);
-		}
 		return c.json(mailboxes);
 	}
 }
