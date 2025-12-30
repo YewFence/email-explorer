@@ -182,6 +182,12 @@ function slugify(text: string) {
 		.replace(/-+$/, ""); // Trim - from end of text
 }
 
+function getMailboxDisplayName(settings: Record<string, unknown>, fallback: string) {
+	const fromName =
+		typeof settings.fromName === "string" ? settings.fromName.trim() : "";
+	return fromName ? fromName : fallback;
+}
+
 // Routes
 class GetMailboxes extends OpenAPIRoute {
 	schema = {
@@ -209,10 +215,7 @@ class GetMailboxes extends OpenAPIRoute {
 					const id = obj.key.replace("mailboxes/", "").replace(".json", "");
 					const mailboxObj = await c.env.BUCKET.get(obj.key);
 					const settings = mailboxObj ? await mailboxObj.json() : {};
-					const name =
-						typeof settings?.fromName === "string" && settings.fromName.trim()
-							? settings.fromName
-							: id;
+					const name = getMailboxDisplayName(settings, id);
 					return {
 						id,
 						name,
@@ -254,10 +257,7 @@ class GetMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 		const settings = await obj.json();
-		const name =
-			typeof settings?.fromName === "string" && settings.fromName.trim()
-				? settings.fromName
-				: mailboxId;
+		const name = getMailboxDisplayName(settings, mailboxId);
 		const response = {
 			id: mailboxId,
 			name,
@@ -301,10 +301,7 @@ class PutMailbox extends OpenAPIRoute {
 
 		await c.env.BUCKET.put(key, JSON.stringify(settings));
 
-		const name =
-			typeof settings?.fromName === "string" && settings.fromName.trim()
-				? settings.fromName
-				: mailboxId;
+		const name = getMailboxDisplayName(settings, mailboxId);
 		const response = {
 			id: mailboxId,
 			name,
