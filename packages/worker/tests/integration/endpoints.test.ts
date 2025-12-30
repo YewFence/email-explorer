@@ -120,14 +120,13 @@ describe("API Integration Tests", () => {
 
 			it("returns fromName for list mailbox display name", async () => {
 				vi.spyOn(env.BUCKET, "list").mockResolvedValue({
-					objects: [{ key: mailboxKey }],
+					objects: [
+						{ key: mailboxKey, customMetadata: { fromName: "Custom Name" } },
+					],
 					truncated: false,
 					cursor: undefined,
 					delimitedPrefixes: [],
 				});
-				vi.spyOn(env.BUCKET, "get").mockResolvedValue({
-					json: async () => ({ fromName: "Custom Name" }),
-				} as R2ObjectBody);
 
 				const response = await authenticatedFetch(
 					"http://local.test/api/v1/mailboxes",
@@ -146,14 +145,13 @@ describe("API Integration Tests", () => {
 
 			it("falls back to mailbox id when list fromName is blank", async () => {
 				vi.spyOn(env.BUCKET, "list").mockResolvedValue({
-					objects: [{ key: mailboxKey }],
+					objects: [
+						{ key: mailboxKey, customMetadata: { fromName: "   " } },
+					],
 					truncated: false,
 					cursor: undefined,
 					delimitedPrefixes: [],
 				});
-				vi.spyOn(env.BUCKET, "get").mockResolvedValue({
-					json: async () => ({ fromName: "   " }),
-				} as R2ObjectBody);
 
 				const response = await authenticatedFetch(
 					"http://local.test/api/v1/mailboxes",

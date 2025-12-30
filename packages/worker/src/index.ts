@@ -209,7 +209,6 @@ class GetMailboxes extends OpenAPIRoute {
 	};
 
 	async handle(c: AppContext) {
-		const BATCH_SIZE = 50;
 		let cursor: string | undefined;
 		const mailboxes: { id: string; name: string; email: string }[] = [];
 
@@ -217,35 +216,21 @@ class GetMailboxes extends OpenAPIRoute {
 			const listResult = await c.env.BUCKET.list({
 				prefix: "mailboxes/",
 				cursor,
+				include: ["customMetadata"],
 			});
-
-			for (let i = 0; i < listResult.objects.length; i += BATCH_SIZE) {
-				const batch = listResult.objects.slice(i, i + BATCH_SIZE);
-				const batchResults = await Promise.all(
-					batch.map(async (obj) => {
-						try {
-							const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-							const mailboxObj = await c.env.BUCKET.get(obj.key);
-							const settings = mailboxObj ? await mailboxObj.json() : {};
-							const name = getMailboxDisplayName(settings, id);
-							return {
-								id,
-								name,
-								email: id,
-							};
-						} catch (error) {
-							console.error(`Failed to process mailbox ${obj.key}:`, error);
-							return null;
-						}
-					}),
-				);
-				mailboxes.push(
-					...batchResults.filter(
-						(mailbox): mailbox is { id: string; name: string; email: string } =>
-							mailbox !== null,
-					),
-				);
-			}
+			const listMailboxes = listResult.objects.map((obj) => {
+				const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+				const fromName =
+					typeof obj.customMetadata?.fromName === "string"
+						? obj.customMetadata.fromName.trim()
+						: "";
+				return {
+					id,
+					name: fromName || id,
+					email: id,
+				};
+			});
+			mailboxes.push(...listMailboxes);
 
 			cursor = listResult.cursor;
 		} while (listResult.truncated);
@@ -324,9 +309,11 @@ class PutMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 
-		await c.env.BUCKET.put(key, JSON.stringify(settings));
-
 		const name = getMailboxDisplayName(settings, mailboxId);
+		await c.env.BUCKET.put(key, JSON.stringify(settings), {
+			customMetadata: { fromName: name },
+		});
+
 		const response = {
 			id: mailboxId,
 			name,
@@ -419,9 +406,12 @@ class PostMailbox extends OpenAPIRoute {
 		};
 
 		const finalSettings = { ...defaultSettings, ...settings };
+		const displayName = getMailboxDisplayName(finalSettings, email);
 
 		// Save mailbox settings to R2
-		await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
+		await c.env.BUCKET.put(key, JSON.stringify(finalSettings), {
+			customMetadata: { fromName: displayName },
+		});
 
 		// Initialize the durable object for this mailbox
 		const ns = c.env.MAILBOX;
@@ -434,7 +424,7 @@ class PostMailbox extends OpenAPIRoute {
 		const response = {
 			id: email,
 			email: email,
-			name: name,
+			name: displayName,
 			settings: finalSettings,
 		};
 
