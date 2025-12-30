@@ -1814,7 +1814,11 @@ async function receiveEmail(
 	if (env.FORWARD_EMAILS) {
 		const forwardEmails = env.FORWARD_EMAILS.split(",")
 			.map((email) => email.trim())
-			.filter((email) => email.length > 0);
+			.filter((email) => {
+				// Basic email validation
+				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+				return email.length > 0 && emailRegex.test(email);
+			});
 
 		if (forwardEmails.length > 0) {
 			const forwardPromises = forwardEmails.map((email) =>
