@@ -93,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from "axios";
 import JSZip from "jszip";
 import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted, watch, ref } from "vue";
@@ -194,14 +195,10 @@ const handleExportAll = async () => {
 		const emailPromises = emails.value.map(async (email) => {
 			try {
 				const url = `/api/v1/mailboxes/${mailboxId}/emails/${email.id}/export`;
-				const response = await fetch(url);
-				if (response.ok) {
-					const blob = await response.blob();
-          const fileName = sanitizeFilename(email.subject, email.id, 50);
-					zip.file(`${fileName}.eml`, blob);
-				} else {
-					console.error(`Failed to export email ${email.id}: ${response.statusText}`);
-				}
+				const response = await axios.get(url, { responseType: 'blob' });
+				const blob = response.data;
+				const fileName = sanitizeFilename(email.subject, email.id, 50);
+				zip.file(`${fileName}.eml`, blob);
 			} catch (err) {
 				console.error(`Error exporting email ${email.id}:`, err);
 			}
@@ -213,10 +210,25 @@ const handleExportAll = async () => {
 		const link = document.createElement("a");
 		link.href = downloadUrl;
 		link.download = `${folderName.value}-emails.zip`;
+		link.style.display = "none";
+		document.body.appendChild(link);
 		link.click();
+		document.body.removeChild(link);
 		URL.revokeObjectURL(downloadUrl);
 	} catch (error) {
-		console.error("Failed to export emails:", error);
+		if (axios.isAxiosError(error)) {
+			const status = error.response?.status;
+			const statusText = error.response?.statusText;
+			const responseData = error.response?.data;
+			console.error("Failed to export emails:", {
+				status,
+				statusText,
+				responseData,
+				message: error.message,
+			});
+		} else {
+			console.error("Failed to export emails:", error);
+		}
 	} finally {
 		isExportingAll.value = false;
 	}

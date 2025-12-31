@@ -1315,7 +1315,8 @@ class GetEmailExport extends OpenAPIRoute {
 		// Generate filename
 		const safeSubject = (email.subject || "email")
 			.replace(/[/\\:*?"<>|]/g, "_")
-			.substring(0, 50);
+			.substring(0, 50)
+			.trim();
 		const filename = `${safeSubject}_${id.substring(0, 8)}.eml`;
 
 		const headers = new Headers();
