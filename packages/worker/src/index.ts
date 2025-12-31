@@ -1271,7 +1271,8 @@ class GetEmailExport extends OpenAPIRoute {
 		// Fetch attachment contents from R2
 		const attachmentsWithContent = [];
 		if (email.attachments && email.attachments.length > 0) {
-			for (const att of email.attachments) {
+			// Map returns promises immediately; Promise.all preserves parallel fetches per attachment.
+			const attachmentPromises = email.attachments.map(async (att) => {
 				const attachmentKey = `attachments/${id}/${att.id}/${att.filename}`;
 				const attachmentObj = await c.env.BUCKET.get(attachmentKey);
 
@@ -1283,15 +1284,19 @@ class GetEmailExport extends OpenAPIRoute {
 						binary += String.fromCharCode(bytes[i]);
 					}
 					const base64 = btoa(binary);
-					attachmentsWithContent.push({
+					return {
 						filename: att.filename,
 						content: base64,
 						mimetype: att.mimetype,
 						disposition: att.disposition,
 						contentId: att.content_id,
-					});
+					};
 				}
-			}
+				return null;
+			});
+			
+			const resolvedAttachments = await Promise.all(attachmentPromises);
+			attachmentsWithContent.push(...resolvedAttachments.filter((att): att is NonNullable<typeof att> => att !== null));
 		}
 
 		// Build EML content
