@@ -4,6 +4,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
+import { buildEmlMessage } from "./eml-builder";
 import { buildMimeMessage } from "./mime-builder";
 import {
 	GetMe,
@@ -1240,6 +1241,133 @@ class GetAttachment extends OpenAPIRoute {
 	}
 }
 
+class GetEmailExport extends OpenAPIRoute {
+	schema = {
+		summary: "Export an email as EML file",
+		operationId: "exportEmail",
+		tags: ["Emails"],
+		request: {
+			params: z.object({
+				mailboxId: z.string(),
+				id: z.string(),
+			}),
+		},
+		responses: {
+			"200": {
+				description: "EML file",
+				content: {
+					"message/rfc822": {
+						schema: z.string().openapi({ format: "binary" }),
+					},
+				},
+			},
+			"404": { description: "Not found", ...contentJson(ErrorResponseSchema) },
+		},
+	};
+
+	async handle(c: AppContext) {
+		const data = await this.getValidatedData<typeof this.schema>();
+		const { mailboxId, id } = data.params;
+
+		const key = `mailboxes/${mailboxId}.json`;
+		const obj = await c.env.BUCKET.head(key);
+		if (!obj) {
+			return c.json({ error: "Mailbox not found" }, 404);
+		}
+
+		const ns = c.env.MAILBOX;
+		const doId = ns.idFromName(mailboxId);
+		const stub = ns.get(doId);
+
+		const emailResult = await stub.getEmail(id);
+
+		if (!emailResult) {
+			return c.json({ error: "Email not found" }, 404);
+		}
+
+		// Type assertion for email data
+		const emailParseResult = EmailSchema.safeParse(emailResult);
+
+		if (!emailParseResult.success) {
+			const validationIssues = emailParseResult.error.issues.map((issue) => ({
+				path: issue.path.join("."),
+				message: issue.message,
+				code: issue.code,
+			}));
+			console.error("Failed to parse email from DO:", emailParseResult.error);
+			return c.json(
+				{
+					error: "Invalid email data",
+					details: validationIssues,
+				},
+				422,
+			);
+		}
+
+		const email = emailParseResult.data;
+
+		// Fetch attachment contents from R2
+		const attachmentsWithContent = [];
+		if (email.attachments && email.attachments.length > 0) {
+			// Map returns promises immediately; Promise.all preserves parallel fetches per attachment.
+			const attachmentPromises = email.attachments.map(async (att) => {
+				const attachmentKey = `attachments/${id}/${att.id}/${att.filename}`;
+				const attachmentObj = await c.env.BUCKET.get(attachmentKey);
+
+				if (attachmentObj) {
+					const arrayBuffer = await attachmentObj.arrayBuffer();
+					const bytes = new Uint8Array(arrayBuffer);
+					let binary = '';
+					for (let i = 0; i < bytes.length; i++) {
+						binary += String.fromCharCode(bytes[i]);
+					}
+					const base64 = btoa(binary);
+					return {
+						filename: att.filename,
+						content: base64,
+						mimetype: att.mimetype,
+						disposition: att.disposition,
+						contentId: att.content_id,
+					};
+				}
+				return null;
+			});
+			
+			const resolvedAttachments = await Promise.all(attachmentPromises);
+			attachmentsWithContent.push(...resolvedAttachments.filter((att): att is NonNullable<typeof att> => att !== null));
+		}
+
+		// Build EML content
+		const emlContent = buildEmlMessage({
+			messageId: email.id,
+			from: email.sender,
+			to: email.recipient,
+			subject: email.subject || "(No Subject)",
+			date: email.date,
+			html: email.body || undefined,
+			inReplyTo: email.in_reply_to,
+			references: email.email_references,
+			attachments: attachmentsWithContent,
+		});
+
+		// Generate filename
+		const safeSubject = (email.subject || "email")
+			.replace(/[/\\:*?"<>|]/g, "_")
+			.substring(0, 50)
+			.trim();
+		const filename = `${safeSubject}_${id.substring(0, 8)}.eml`;
+
+		const headers = new Headers();
+		headers.set("Content-Type", "message/rfc822");
+		headers.set(
+			"Content-Disposition",
+			`attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+		);
+
+		return new Response(emlContent, { headers });
+	}
+}
+
 class CreateDummyMailbox extends OpenAPIRoute {
 	schema = {
 		summary: "Create a dummy mailbox for debugging",
@@ -1639,6 +1767,10 @@ openapi.get(
 	"/api/v1/mailboxes/:mailboxId/emails/:emailId/attachments/:attachmentId",
 	GetAttachment,
 );
+openapi.get(
+	"/api/v1/mailboxes/:mailboxId/emails/:id/export",
+	GetEmailExport,
+);
 
 async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 	const result = new Uint8Array(streamSize);
@@ -1656,7 +1788,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 }
 
 async function receiveEmail(
-	event: { raw: ReadableStream; rawSize: number },
+	event: { raw: ReadableStream; rawSize: number; message: ForwardableEmailMessage },
 	env: Env,
 	_ctx: ExecutionContext,
 ) {
@@ -1718,6 +1850,83 @@ async function receiveEmail(
 		},
 		attachmentData,
 	);
+
+	// ----------------------
+	// 邮件转发功能
+	// ----------------------
+	let fwdStatus = "";
+	if (env.FORWARD_EMAILS) {
+		const forwardEmails = env.FORWARD_EMAILS.split(",")
+			.map((email) => email.trim())
+			.filter((email) => {
+				// Basic email validation
+				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+				return email.length > 0 && emailRegex.test(email);
+			});
+
+		if (forwardEmails.length > 0) {
+			const forwardPromises = forwardEmails.map((email) =>
+				event.message
+					.forward(email)
+					.then(() => `${email}: ✅`)
+					.catch((err) => `${email}: ❌(${err.message})`),
+			);
+
+			const results = await Promise.all(forwardPromises);
+			fwdStatus = results.join(" | ");
+			console.log(`[Forward Logic] ${fwdStatus}`);
+		}
+	}
+
+	// ----------------------
+	// Telegram 通知
+	// ----------------------
+	if (env.TG_TOKEN && env.TG_CHAT_ID) {
+		try {
+			const subject = parsedEmail.subject || "No Subject";
+			const from = parsedEmail.from?.address || "Unknown";
+			const to = parsedEmail.to[0].address;
+			
+			let summary = `📧 新邮件\nFrom: ${from}\nTo: ${to}\nSubject: ${subject}`;
+			
+			if (fwdStatus) {
+				summary += `\n\n转发状态:\n${fwdStatus}`;
+			}
+
+			const tgUrl = `https://api.telegram.org/bot${env.TG_TOKEN}/sendMessage`;
+
+			const response = await fetch(tgUrl, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					chat_id: env.TG_CHAT_ID,
+					text: summary,
+				}),
+			});
+
+			const telegramResponseSchema = z.object({
+				ok: z.boolean(),
+				error_code: z.number().optional(),
+				description: z.string().optional(),
+			});
+
+			const resultJson = await response.json();
+			const parsedResult = telegramResponseSchema.safeParse(resultJson);
+			if (!parsedResult.success) {
+				console.error(`[Telegram FAILED] Invalid response: ${parsedResult.error}`);
+				return;
+			}
+			const result = parsedResult.data;
+
+			if (result.ok) {
+				console.log("[Telegram Success] Notification sent.");
+			} else {
+				console.error(`[Telegram FAILED] API Error: ${JSON.stringify(result)}`);
+			}
+		} catch (tgError) {
+			console.error(`[Telegram Network Error] ${tgError}`);
+		}
+	}
 }
 
 const defaultOptions: EmailExplorerOptions = {
@@ -1739,7 +1948,7 @@ export function EmailExplorer(_options: EmailExplorerOptions = {}) {
 
 	return {
 		async email(
-			event: { raw: ReadableStream; rawSize: number },
+			event: { raw: ReadableStream; rawSize: number; message: ForwardableEmailMessage },
 			env: Env,
 			context: ExecutionContext,
 		) {

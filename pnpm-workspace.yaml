@@ -1,3 +1,9 @@
 packages:
-  - "packages/*"
-  - "packages/worker/dev"
+  - packages/*
+  - packages/worker/dev
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - sharp
+  - workerd

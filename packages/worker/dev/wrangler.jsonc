@@ -45,5 +45,12 @@
 			"tag": "v1",
 			"new_sqlite_classes": ["MailboxDO"]
 		}
-	]
+	],
+	// 可选：邮件转发和 Telegram 通知配置
+	// 取消注释并填入你的配置以启用这些功能
+	// "vars": {
+	// 	  "FORWARD_EMAILS": "email1@example.com,email2@example.com",
+	// 	  "TG_TOKEN": "your-telegram-bot-token",
+	// 	  "TG_CHAT_ID": "your-telegram-chat-id"
+	// }
 }

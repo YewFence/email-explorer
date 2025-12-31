@@ -1094,4 +1094,108 @@ describe("API Integration Tests", () => {
 			expect(getEmailBody2.attachments[0].content_id).toBe(null);
 		});
 	});
+
+	// Tests for Export Email
+	describe("Export Email API", () => {
+		it("should export an email as EML file", async () => {
+			await createMailbox();
+			const emailData = {
+				to: ["recipient@example.com"],
+				from: "sender@example.com",
+				subject: "Test Export Email",
+				text: "This is a test email for export.",
+				html: "<p>This is a test email for export.</p>",
+			};
+
+			const postResponse = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/${mailboxId}/emails`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(emailData),
+				},
+			);
+			const postBody = await postResponse.json<any>();
+			const emailId = postBody.id;
+
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`,
+			);
+			const body = await response.text();
+
+			expect(response.status).toBe(200);
+			expect(response.headers.get("Content-Type")).toBe("message/rfc822");
+			expect(response.headers.get("Content-Disposition")).toContain(".eml");
+
+			// Verify EML content structure
+			expect(body).toContain("From:");
+			expect(body).toContain("To:");
+			expect(body).toContain("Subject:");
+			expect(body).toContain("MIME-Version: 1.0");
+			expect(body).toContain("Message-ID:");
+		});
+
+		it("should export an email with attachments", async () => {
+			await createMailbox();
+			const attachmentContent = "attachment content for export test";
+			const attachmentContentBase64 = btoa(attachmentContent);
+
+			const emailData = {
+				to: ["recipient@example.com"],
+				from: "sender@example.com",
+				subject: "Email with attachment for export",
+				text: "This email has an attachment.",
+				attachments: [
+					{
+						content: attachmentContentBase64,
+						filename: "export-test.txt",
+						type: "text/plain",
+						disposition: "attachment",
+					},
+				],
+			};
+
+			const postResponse = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/${mailboxId}/emails`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(emailData),
+				},
+			);
+			const postBody = await postResponse.json<any>();
+			const emailId = postBody.id;
+
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`,
+			);
+			const body = await response.text();
+
+			expect(response.status).toBe(200);
+			expect(response.headers.get("Content-Type")).toBe("message/rfc822");
+
+			// Verify EML contains attachment headers
+			expect(body).toContain("multipart/mixed");
+			expect(body).toContain("export-test.txt");
+			expect(body).toContain("Content-Transfer-Encoding: base64");
+		});
+
+		it("should return 404 for non-existent email export", async () => {
+			await createMailbox();
+
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/${mailboxId}/emails/non-existent-id/export`,
+			);
+
+			expect(response.status).toBe(404);
+		});
+
+		it("should return 404 for non-existent mailbox export", async () => {
+			const response = await authenticatedFetch(
+				`http://local.test/api/v1/mailboxes/nonexistent@example.com/emails/some-id/export`,
+			);
+
+			expect(response.status).toBe(404);
+		});
+	});
 });
