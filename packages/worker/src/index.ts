@@ -1860,7 +1860,19 @@ async function receiveEmail(
 				}),
 			});
 
-			const result = await response.json() as { ok?: boolean; error_code?: number; description?: string };
+			const telegramResponseSchema = z.object({
+				ok: z.boolean(),
+				error_code: z.number().optional(),
+				description: z.string().optional(),
+			});
+
+			const resultJson = await response.json();
+			const parsedResult = telegramResponseSchema.safeParse(resultJson);
+			if (!parsedResult.success) {
+				console.error(`[Telegram FAILED] Invalid response: ${parsedResult.error}`);
+				return;
+			}
+			const result = parsedResult.data;
 
 			if (result.ok) {
 				console.log("[Telegram Success] Notification sent.");
