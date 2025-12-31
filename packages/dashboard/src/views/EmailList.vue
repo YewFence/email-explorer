@@ -100,6 +100,7 @@ import { useRoute } from "vue-router";
 import { useEmailStore } from "@/stores/emails";
 import { useFolderStore } from "@/stores/folders";
 import type { Email } from "@/types";
+import { downloadFileFromUrl, sanitizeFilename } from "@/utils/file";
 
 const emailStore = useEmailStore();
 const { emails, isRefreshing } = storeToRefs(emailStore);
@@ -168,29 +169,14 @@ const toggleStarStatus = (email: Email) => {
 	});
 };
 
-const downloadFile = (url: string, fileName: string) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', fileName); // Download and name
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
 const handleExport = (emailId: string) => {
 	try {
 		const mailboxId = route.params.mailboxId as string;
 		const emailSubject = emails.value.find(email => email.id === emailId)?.subject || '';
 		// Sanitize the subject by removing invalid file name characters
-		const sanitizedSubject = emailSubject
-			.replace(/[/\\:*?"<>|]/g, '_')
-			.substring(0, 50)
-			.trim();
-		// Fallback to emailId if subject is empty after sanitization
-		const fileName = sanitizedSubject || emailId;
+		const fileName = sanitizeFilename(emailSubject,emailId, 50);
 		const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
-		downloadFile(url, `${fileName}.eml`);
+		downloadFileFromUrl(url, `${fileName}.eml`);
 	} catch (error) {
 		console.error(`Failed to export email ${emailId}:`, error);
 		alert('Failed to export email. Please try again.');
@@ -211,11 +197,7 @@ const handleExportAll = async () => {
 				const response = await fetch(url);
 				if (response.ok) {
 					const blob = await response.blob();
-					const sanitizedSubject = email.subject
-						.replace(/[/\\:*?"<>|]/g, '_')
-						.substring(0, 50)
-						.trim();
-					const fileName = sanitizedSubject || email.id;
+          const fileName = sanitizeFilename(email.subject, email.id, 50);
 					zip.file(`${fileName}.eml`, blob);
 				} else {
 					console.error(`Failed to export email ${email.id}: ${response.statusText}`);

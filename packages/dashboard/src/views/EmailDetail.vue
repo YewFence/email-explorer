@@ -126,6 +126,8 @@ import EmailIframe from "@/components/EmailIframe.vue";
 import { useEmailStore } from "@/stores/emails";
 import { useFolderStore } from "@/stores/folders";
 import { useUIStore } from "@/stores/ui";
+import { downloadFileFromUrl } from "@/utils/file";
+import { sanitizeFilename } from "@/utils/file";
 
 const emailStore = useEmailStore();
 const { currentEmail: email } = storeToRefs(emailStore);
@@ -192,24 +194,12 @@ const getAttachmentUrl = (attachmentId: string) => {
 	return `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`;
 };
 
-const downloadFile = (url: string, fileName: string) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', fileName); // Download and name
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
 const handleExport = () => {
 	const mailboxId = route.params.mailboxId as string;
 	const emailId = route.params.id as string;
-	const safeSubject = (email.value?.subject || emailId)
-		.replace(/[/\\:*?"<>|]/g, '_')
-		.substring(0, 50);
+  const safeSubject = email.value ? sanitizeFilename(email.value.subject, emailId, 50) : null;
 	const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/export`;
-	downloadFile(url, `${safeSubject || emailId}.eml`);
+	downloadFileFromUrl(url, `${safeSubject || emailId}.eml`);
 };
 
 const formatBytes = (bytes: number, decimals = 2) => {
