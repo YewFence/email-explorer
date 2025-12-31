@@ -210,29 +210,31 @@ class GetMailboxes extends OpenAPIRoute {
 
 	async handle(c: AppContext) {
 		let cursor: string | undefined;
+		let listResult: Awaited<ReturnType<typeof c.env.BUCKET.list>>;
 		const mailboxes: { id: string; name: string; email: string }[] = [];
 
 		do {
-			const listResult = await c.env.BUCKET.list({
+			listResult = await c.env.BUCKET.list({
 				prefix: "mailboxes/",
 				cursor,
 				include: ["customMetadata"],
 			});
 			const listMailboxes = listResult.objects.map((obj) => {
 				const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-				const fromName =
-					typeof obj.customMetadata?.fromName === "string"
-						? obj.customMetadata.fromName.trim()
-						: "";
+				const name = getMailboxDisplayName(obj.customMetadata, id);
 				return {
 					id,
-					name: fromName || id,
+					name,
 					email: id,
 				};
 			});
 			mailboxes.push(...listMailboxes);
 
-			cursor = listResult.cursor;
+			if (listResult.truncated) {
+				cursor = listResult.cursor;
+			} else {
+				cursor = undefined;
+			}
 		} while (listResult.truncated);
 
 		return c.json(mailboxes);
@@ -309,10 +311,14 @@ class PutMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 
-		const name = getMailboxDisplayName(settings, mailboxId);
+		const fromName =
+			typeof (settings as Record<string, unknown>)?.fromName === "string"
+				? ((settings as Record<string, unknown>).fromName as string).trim()
+				: "";
 		await c.env.BUCKET.put(key, JSON.stringify(settings), {
-			customMetadata: { fromName: name },
+			customMetadata: { fromName },
 		});
+		const name = fromName || mailboxId;
 
 		const response = {
 			id: mailboxId,
@@ -406,11 +412,15 @@ class PostMailbox extends OpenAPIRoute {
 		};
 
 		const finalSettings = { ...defaultSettings, ...settings };
-		const displayName = getMailboxDisplayName(finalSettings, email);
+		const fromName =
+			typeof (finalSettings as Record<string, unknown>)?.fromName === "string"
+				? ((finalSettings as Record<string, unknown>).fromName as string).trim()
+				: "";
+		const displayName = fromName || email;
 
 		// Save mailbox settings to R2
 		await c.env.BUCKET.put(key, JSON.stringify(finalSettings), {
-			customMetadata: { fromName: displayName },
+			customMetadata: { fromName },
 		});
 
 		// Initialize the durable object for this mailbox
