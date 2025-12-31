@@ -1248,25 +1248,25 @@ class GetEmailExport extends OpenAPIRoute {
 		}
 
 		// Type assertion for email data
-		const email = emailResult as unknown as {
-			id: string;
-			subject: string;
-			sender: string;
-			recipient: string;
-			date: string;
-			body: string;
-			read: boolean;
-			starred: boolean;
-			in_reply_to: string | null;
-			email_references: string | null;
-			attachments: Array<{
-				id: string;
-				filename: string;
-				mimetype: string;
-				disposition: string | null;
-				content_id: string | null;
-			}>;
-		};
+		const emailParseResult = EmailSchema.safeParse(emailResult);
+
+		if (!emailParseResult.success) {
+			const validationIssues = emailParseResult.error.issues.map((issue) => ({
+				path: issue.path.join("."),
+				message: issue.message,
+				code: issue.code,
+			}));
+			console.error("Failed to parse email from DO:", emailParseResult.error);
+			return c.json(
+				{
+					error: "Invalid email data",
+					details: validationIssues,
+				},
+				422,
+			);
+		}
+
+		const email = emailParseResult.data;
 
 		// Fetch attachment contents from R2
 		const attachmentsWithContent = [];
