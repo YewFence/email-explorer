@@ -44,9 +44,7 @@ const fromName = computed({
 		if (!mailbox.value.settings) {
 			mailbox.value.settings = {};
 		}
-		const effectiveValue =
-			value === "" ? (mailbox.value.name ?? "") : value;
-		mailbox.value.settings.fromName = effectiveValue;
+		mailbox.value.settings.fromName = value;
 	},
 });
 
