@@ -1,11 +1,21 @@
-import { describe, expect, it, beforeAll } from "vitest";
-import {authenticatedFetch, createMailbox, mailboxId, testAuthBeforeAll} from "./utils";
+import { env } from "cloudflare:test";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { R2Object, R2ObjectBody } from "@cloudflare/workers-types";
+import {
+	authenticatedFetch,
+	createMailbox,
+	mailboxId,
+	testAuthBeforeAll,
+} from "./utils";
 
 
 
 describe("API Integration Tests", () => {
 	// Setup authentication once for all tests
 	beforeAll(testAuthBeforeAll);
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
 
 	// Tests for Mailboxes
 	describe("Mailboxes API", () => {
@@ -103,6 +113,148 @@ describe("API Integration Tests", () => {
 				`http://local.test/api/v1/mailboxes/${mailboxId}`,
 			);
 			expect(getResponse.status).toBe(404);
+		});
+
+		describe("display name behavior", () => {
+			const mailboxKey = `mailboxes/${mailboxId}.json`;
+
+			it("returns fromName for list mailbox display name", async () => {
+				vi.spyOn(env.BUCKET, "list").mockResolvedValue({
+					objects: [
+						{ key: mailboxKey, customMetadata: { fromName: "Custom Name" } },
+					],
+					truncated: false,
+					cursor: undefined,
+					delimitedPrefixes: [],
+				});
+
+				const response = await authenticatedFetch(
+					"http://local.test/api/v1/mailboxes",
+				);
+				const body = await response.json<any[]>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual([
+					expect.objectContaining({
+						id: mailboxId,
+						name: "Custom Name",
+						email: mailboxId,
+					}),
+				]);
+			});
+
+			it("falls back to mailbox id when list fromName is blank", async () => {
+				vi.spyOn(env.BUCKET, "list").mockResolvedValue({
+					objects: [
+						{ key: mailboxKey, customMetadata: { fromName: "   " } },
+					],
+					truncated: false,
+					cursor: undefined,
+					delimitedPrefixes: [],
+				});
+
+				const response = await authenticatedFetch(
+					"http://local.test/api/v1/mailboxes",
+				);
+				const body = await response.json<any[]>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual([
+					expect.objectContaining({
+						id: mailboxId,
+						name: mailboxId,
+						email: mailboxId,
+					}),
+				]);
+			});
+
+			it("returns fromName for mailbox detail display name", async () => {
+				vi.spyOn(env.BUCKET, "get").mockResolvedValue({
+					json: async () => ({ fromName: "Detail Name" }),
+				} as R2ObjectBody);
+
+				const response = await authenticatedFetch(
+					`http://local.test/api/v1/mailboxes/${mailboxId}`,
+				);
+				const body = await response.json<any>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual(
+					expect.objectContaining({
+						id: mailboxId,
+						name: "Detail Name",
+						email: mailboxId,
+					}),
+				);
+			});
+
+			it("falls back to mailbox id when detail fromName is missing", async () => {
+				vi.spyOn(env.BUCKET, "get").mockResolvedValue({
+					json: async () => ({}),
+				} as R2ObjectBody);
+
+				const response = await authenticatedFetch(
+					`http://local.test/api/v1/mailboxes/${mailboxId}`,
+				);
+				const body = await response.json<any>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual(
+					expect.objectContaining({
+						id: mailboxId,
+						name: mailboxId,
+						email: mailboxId,
+					}),
+				);
+			});
+
+			it("returns fromName for update mailbox display name", async () => {
+				vi.spyOn(env.BUCKET, "head").mockResolvedValue({} as R2Object);
+				vi.spyOn(env.BUCKET, "put").mockResolvedValue();
+
+				const response = await authenticatedFetch(
+					`http://local.test/api/v1/mailboxes/${mailboxId}`,
+					{
+						method: "PUT",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ settings: { fromName: "Updated Name" } }),
+					},
+				);
+				const body = await response.json<any>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual(
+					expect.objectContaining({
+						id: mailboxId,
+						name: "Updated Name",
+						email: mailboxId,
+					}),
+				);
+			});
+
+			it("falls back to mailbox id when update fromName is empty", async () => {
+				vi.spyOn(env.BUCKET, "head").mockResolvedValue({} as R2Object);
+				vi.spyOn(env.BUCKET, "put").mockResolvedValue();
+
+				const response = await authenticatedFetch(
+					`http://local.test/api/v1/mailboxes/${mailboxId}`,
+					{
+						method: "PUT",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ settings: { fromName: " " } }),
+					},
+				);
+				const body = await response.json<any>();
+
+				expect(response.status).toBe(200);
+				expect(body).toEqual(
+					expect.objectContaining({
+						id: mailboxId,
+						name: mailboxId,
+						email: mailboxId,
+					}),
+				);
+			});
 		});
 	});
 

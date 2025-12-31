@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700">
-    <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50 flex items-center justify-between">
+    <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/50 flex items-center justify-between">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white capitalize">{{ folderName }}</h1>
       <button 
         @click="handleRefresh"
@@ -18,17 +18,17 @@
       </button>
     </div>
     <ul v-if="emails.length > 0" class="divide-y divide-gray-100 dark:divide-gray-700/50">
-      <li v-for="email in emails" :key="email.id" class="group relative transition-all duration-200" :class="{ 'bg-indigo-50/30 dark:bg-indigo-900/10': !email.read, 'hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/30 dark:hover:from-indigo-900/10 dark:hover:to-purple-900/10': true }">
+      <li v-for="email in emails" :key="email.id" class="group relative transition-all duration-200" :class="{ 'bg-indigo-50/30 dark:bg-indigo-900/10': !email.read, 'hover:bg-linear-to-r hover:from-indigo-50/50 hover:to-purple-50/30 dark:hover:from-indigo-900/10 dark:hover:to-purple-900/10': true }">
         <router-link :to="{ name: 'EmailDetail', params: { id: email.id }, query: { fromFolder: folderId } }" class="block px-6 py-4">
           <div class="flex items-start justify-between gap-4">
-            <div class="flex-grow overflow-hidden min-w-0">
+            <div class="grow overflow-hidden min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <div v-if="!email.read" class="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full flex-shrink-0"></div>
+                <div v-if="!email.read" class="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full shrink-0"></div>
                 <p class="text-sm font-semibold text-gray-900 dark:text-white truncate" :class="{'font-bold': !email.read}">{{ email.sender }}</p>
               </div>
               <p class="text-base text-gray-800 dark:text-gray-300 truncate" :class="{'font-semibold': !email.read, 'font-normal': email.read}">{{ email.subject }}</p>
             </div>
-            <div class="flex-shrink-0 flex items-center gap-2">
+            <div class="shrink-0 flex items-center gap-2">
               <p class="text-xs text-gray-500 dark:text-gray-400 group-hover:hidden whitespace-nowrap">{{ email.date }}</p>
               <div class="hidden group-hover:flex items-center gap-1">
                 <button @click.prevent="toggleStarStatus(email)" class="p-2 text-gray-400 hover:text-yellow-500 dark:text-gray-500 dark:hover:text-yellow-400 rounded-lg hover:bg-yellow-50 dark:hover:bg-gray-700/50 transition-all duration-200" :class="{'text-yellow-500 dark:text-yellow-400': email.starred}" :title="email.starred ? 'Unstar' : 'Star'">
@@ -60,7 +60,7 @@
       </li>
     </ul>
     <div v-else class="p-16 text-center">
-      <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center">
+      <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-linear-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center">
         <svg class="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
         </svg>
@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { computed, onMounted, onUnmounted, watch, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useEmailStore } from "@/stores/emails";
 import { useFolderStore } from "@/stores/folders";

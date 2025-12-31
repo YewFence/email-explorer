@@ -182,6 +182,18 @@ function slugify(text: string) {
 		.replace(/-+$/, ""); // Trim - from end of text
 }
 
+function getMailboxDisplayName(settings: unknown, fallback: string) {
+	const normalizedSettings =
+		typeof settings === "object" && settings !== null
+			? (settings as Record<string, unknown>)
+			: {};
+	const fromName =
+		typeof normalizedSettings.fromName === "string"
+			? normalizedSettings.fromName.trim()
+			: "";
+	return fromName ? fromName : fallback;
+}
+
 // Routes
 class GetMailboxes extends OpenAPIRoute {
 	schema = {
@@ -197,17 +209,34 @@ class GetMailboxes extends OpenAPIRoute {
 	};
 
 	async handle(c: AppContext) {
-		const list = await c.env.BUCKET.list({
-			prefix: "mailboxes/",
-		});
-		const mailboxes = list.objects.map((obj) => {
-			const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-			return {
-				id,
-				name: id,
-				email: id,
-			};
-		});
+		let cursor: string | undefined;
+		let listResult: Awaited<ReturnType<typeof c.env.BUCKET.list>>;
+		const mailboxes: { id: string; name: string; email: string }[] = [];
+
+		do {
+			listResult = await c.env.BUCKET.list({
+				prefix: "mailboxes/",
+				cursor,
+				include: ["customMetadata"],
+			});
+			const listMailboxes = listResult.objects.map((obj) => {
+				const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+				const name = getMailboxDisplayName(obj.customMetadata, id);
+				return {
+					id,
+					name,
+					email: id,
+				};
+			});
+			mailboxes.push(...listMailboxes);
+
+			if (listResult.truncated) {
+				cursor = listResult.cursor;
+			} else {
+				cursor = undefined;
+			}
+		} while (listResult.truncated);
+
 		return c.json(mailboxes);
 	}
 }
@@ -240,9 +269,10 @@ class GetMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 		const settings = await obj.json();
+		const name = getMailboxDisplayName(settings, mailboxId);
 		const response = {
 			id: mailboxId,
-			name: mailboxId,
+			name,
 			email: mailboxId,
 			settings: settings,
 		};
@@ -281,11 +311,15 @@ class PutMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 
-		await c.env.BUCKET.put(key, JSON.stringify(settings));
+		const fromName = getMailboxDisplayName(settings, "");
+		await c.env.BUCKET.put(key, JSON.stringify(settings), {
+			customMetadata: { fromName },
+		});
+		const name = fromName || mailboxId;
 
 		const response = {
 			id: mailboxId,
-			name: mailboxId,
+			name,
 			email: mailboxId,
 			settings: settings,
 		};
@@ -375,9 +409,13 @@ class PostMailbox extends OpenAPIRoute {
 		};
 
 		const finalSettings = { ...defaultSettings, ...settings };
+		const fromName = getMailboxDisplayName(finalSettings, "");
+		const displayName = fromName || email;
 
 		// Save mailbox settings to R2
-		await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
+		await c.env.BUCKET.put(key, JSON.stringify(finalSettings), {
+			customMetadata: { fromName },
+		});
 
 		// Initialize the durable object for this mailbox
 		const ns = c.env.MAILBOX;
@@ -390,7 +428,7 @@ class PostMailbox extends OpenAPIRoute {
 		const response = {
 			id: email,
 			email: email,
-			name: name,
+			name: displayName,
 			settings: finalSettings,
 		};
 
