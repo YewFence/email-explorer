@@ -165,6 +165,15 @@ pnpm install
 pnpm --filter email-explorer deploy
 ```
 
+**Deploy via GitHub Actions:**
+
+1. Add the following repository secrets:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+2. Push to the `main` branch or trigger the workflow manually.
+
+The workflow file lives at `.github/workflows/deploy.yml` and runs `pnpm build` followed by `wrangler deploy`.
+
 ### Configuration
 
 Email Explorer uses a factory function pattern for configuration. Edit `src/index.ts`:
