@@ -311,10 +311,7 @@ class PutMailbox extends OpenAPIRoute {
 			return c.json({ error: "Not found" }, 404);
 		}
 
-		const fromName =
-			typeof (settings as Record<string, unknown>)?.fromName === "string"
-				? ((settings as Record<string, unknown>).fromName as string).trim()
-				: "";
+		const fromName = getMailboxDisplayName(settings, "");
 		await c.env.BUCKET.put(key, JSON.stringify(settings), {
 			customMetadata: { fromName },
 		});
@@ -412,10 +409,7 @@ class PostMailbox extends OpenAPIRoute {
 		};
 
 		const finalSettings = { ...defaultSettings, ...settings };
-		const fromName =
-			typeof (finalSettings as Record<string, unknown>)?.fromName === "string"
-				? ((finalSettings as Record<string, unknown>).fromName as string).trim()
-				: "";
+		const fromName = getMailboxDisplayName(finalSettings, "");
 		const displayName = fromName || email;
 
 		// Save mailbox settings to R2
