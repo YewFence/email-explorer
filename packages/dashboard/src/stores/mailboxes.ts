@@ -16,7 +16,7 @@ export const useMailboxStore = defineStore("mailboxes", {
 			const response = await api.getMailbox(id);
 			this.currentMailbox = response.data;
 		},
-		async updateMailbox(id: string, settings: any) {
+		async updateMailbox(id: string, settings: Mailbox["settings"]) {
 			const response = await api.updateMailbox(id, settings);
 			this.currentMailbox = response.data;
 		},
